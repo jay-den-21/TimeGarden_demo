@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowUpRight, ArrowDownLeft, Download, Lock, Loader2 } from 'lucide-react';
-import { getWalletData, getMyTransactions } from '../services/mockDatabase';
+import { getWalletData, getMyTransactions, exportTransactions } from '../services/mockDatabase';
 import { WalletData, Transaction } from '../types';
 
 const MOCK_CHART_DATA = [
@@ -15,6 +15,7 @@ const Wallet: React.FC = () => {
   const [wallet, setWallet] = useState<WalletData>({ balance: 0, escrowBalance: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     Promise.all([getWalletData(), getMyTransactions()]).then(([w, t]) => {
@@ -23,6 +24,25 @@ const Wallet: React.FC = () => {
       setLoading(false);
     });
   }, []);
+
+  const handleExport = async (format: 'json' | 'csv' = 'json') => {
+    setExporting(true);
+    try {
+      const blob = await exportTransactions(format);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      alert(`Export failed: ${error.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>;
 
@@ -34,9 +54,24 @@ const Wallet: React.FC = () => {
              <p className="text-gray-500">Manage your Time Coins and view transaction history</p>
         </div>
         <div className="flex space-x-3">
-            <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-                <Download size={16} className="mr-2"/> Export
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => handleExport('json')}
+                disabled={exporting}
+                className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Download size={16} className="mr-2"/>
+                {exporting ? 'Exporting...' : 'Export JSON'}
+              </button>
+              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg hidden group-hover:block">
+                <button 
+                  onClick={() => handleExport('csv')}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  Export CSV
+                </button>
+              </div>
+            </div>
             <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm">
                 <ArrowUpRight size={16} className="mr-2"/> Add Funds
             </button>
@@ -100,7 +135,10 @@ const Wallet: React.FC = () => {
                 <div className="font-semibold text-purple-900">Withdraw</div>
                 <div className="text-xs text-purple-700">Transfer to bank</div>
            </button>
-           <button className="p-4 bg-pink-50 hover:bg-pink-100 rounded-xl border border-pink-100 transition-colors text-left group">
+           <button 
+             onClick={() => handleExport('json')}
+             className="p-4 bg-pink-50 hover:bg-pink-100 rounded-xl border border-pink-100 transition-colors text-left group"
+           >
                 <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center text-pink-700 mb-2 group-hover:scale-110 transition-transform">
                     <Download size={16} />
                 </div>
@@ -120,10 +158,18 @@ const Wallet: React.FC = () => {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-gray-900">Transaction History</h3>
-              <select className="text-sm border-gray-300 border rounded-lg px-2 py-1">
-                  <option>All Time</option>
-                  <option>This Month</option>
-              </select>
+              <div className="flex items-center space-x-2">
+                <select className="text-sm border-gray-300 border rounded-lg px-2 py-1">
+                    <option>All Time</option>
+                    <option>This Month</option>
+                </select>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="text-sm px-3 py-1 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Export CSV
+                </button>
+              </div>
           </div>
 
           <div className="space-y-4">

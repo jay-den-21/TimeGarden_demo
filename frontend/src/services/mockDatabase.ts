@@ -184,3 +184,23 @@ export const initiateThread = async (taskId: number, partnerId: number): Promise
     body: JSON.stringify({ taskId, partnerId }),
   });
 };
+
+export const exportTransactions = async (format: 'json' | 'csv' = 'json'): Promise<Blob> => {
+  const user = getUser();
+  if (!user || !user.id) {
+    throw new Error('User not logged in');
+  }
+
+  const response = await fetch(`${API_URL}/transactions/export?format=${format}`, {
+    method: 'GET',
+    headers: {
+      'X-User-Id': user.id.toString(),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.status} ${response.statusText}`);
+  }
+
+  return await response.blob();
+};
