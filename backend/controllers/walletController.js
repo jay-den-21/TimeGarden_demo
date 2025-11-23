@@ -11,7 +11,8 @@ const getWallet = async (req, res) => {
       [userId]
     );
     if (rows.length === 0) {
-      return res.json({ balance: 0, escrowBalance: 0 });
+      // Default balance for new users is 50 TC
+      return res.json({ balance: 50, escrowBalance: 0 });
     }
     res.json(rows[0]);
   } catch (err) {

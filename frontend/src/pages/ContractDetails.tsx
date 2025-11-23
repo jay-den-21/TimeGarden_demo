@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { CheckCircle, Lock, FileText, Upload, Shield, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 import { ContractStatus, Contract } from '../types';
-import { getContractById, CURRENT_USER_ID } from '../services/mockDatabase';
+import { getContractById } from '../services/mockDatabase';
+import { getUser } from '../services/authService';
 
 const ContractDetails: React.FC = () => {
   const { id } = useParams();
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
+  const currentUser = getUser();
 
   useEffect(() => {
     if (id) {
@@ -31,7 +33,7 @@ const ContractDetails: React.FC = () => {
     { id: 3, label: 'Released', icon: CheckCircle, done: contract.status === ContractStatus.COMPLETED },
   ];
 
-  const isRequester = contract.requesterId === CURRENT_USER_ID;
+  const isRequester = currentUser && contract && contract.requesterId === currentUser.id;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

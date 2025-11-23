@@ -18,13 +18,11 @@ const Login: React.FC = () => {
     try {
       const result = await login(email, password);
       if (result.success) {
-        // Store token if provided
-        if (result.token) {
-          localStorage.setItem('token', result.token);
-        }
+        // User data is already stored by authService
         // Redirect to dashboard
         navigate('/');
-        window.location.reload(); // Refresh to update user state
+        // Trigger a custom event to notify Layout component
+        window.dispatchEvent(new Event('auth-state-changed'));
       } else {
         setError(result.message || 'Login failed');
       }

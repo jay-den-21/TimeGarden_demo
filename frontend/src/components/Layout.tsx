@@ -15,7 +15,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { getCurrentUser, getWalletData } from '../services/mockDatabase';
-import { logout, isAuthenticated } from '../services/authService';
+import { logout, isAuthenticated, getUser } from '../services/authService';
 import { User, WalletData } from '../types';
 
 interface SidebarItemProps {
@@ -53,18 +53,42 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setAuthenticated(authStatus);
       
       if (authStatus) {
+        // First try to get user from localStorage (faster)
+        const storedUser = getUser();
+        if (storedUser) {
+          setUser(storedUser);
+        }
+        
+        // Then fetch from API to get latest data
         try {
           const userData = await getCurrentUser();
           setUser(userData);
           const walletData = await getWalletData();
           setWallet(walletData);
         } catch (error) {
-          // If API fails, user might not be logged in
-          setAuthenticated(false);
+          // If API fails but we have stored user, keep using it
+          if (!storedUser) {
+            setAuthenticated(false);
+          }
         }
+      } else {
+        setUser(null);
+        setWallet({ balance: 0, escrowBalance: 0 });
       }
     };
+    
     checkAuth();
+    
+    // Listen for auth state changes (login/register/logout)
+    const handleAuthChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('auth-state-changed', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('auth-state-changed', handleAuthChange);
+    };
   }, []);
 
   const handleLogout = () => {

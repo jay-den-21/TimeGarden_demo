@@ -16,7 +16,7 @@ CREATE TABLE users (
 -- 2. Wallets Table
 CREATE TABLE wallets (
     user_id INT PRIMARY KEY,
-    balance DECIMAL(10, 2) DEFAULT 0.00,
+    balance DECIMAL(10, 2) DEFAULT 50.00,
     escrow_balance DECIMAL(10, 2) DEFAULT 0.00,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

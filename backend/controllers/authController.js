@@ -38,9 +38,9 @@ const register = async (req, res) => {
 
     const userId = result.insertId;
 
-    // Create wallet for new user
+    // Create wallet for new user with default balance of 50 TC
     await pool.query(
-      'INSERT INTO wallets (user_id, balance, escrow_balance) VALUES (?, 0, 0)',
+      'INSERT INTO wallets (user_id, balance, escrow_balance) VALUES (?, 50.00, 0.00)',
       [userId]
     );
 

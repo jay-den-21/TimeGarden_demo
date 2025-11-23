@@ -1,11 +1,29 @@
 import { Contract, Task, Transaction, WalletData, ChatThread, ChatMessage, Proposal, Review, User } from '../types';
 
 const API_URL = 'http://localhost:4000/api';
-export const CURRENT_USER_ID = 2; // Logic handled on backend, but kept for type consistency if needed
+import { getUser } from './authService';
 
-async function fetchAPI<T>(endpoint: string): Promise<T> {
+// Remove the old CURRENT_USER_ID export, now using getUser() from authService
+
+async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   try {
-    const res = await fetch(`${API_URL}${endpoint}`);
+    // Get current user ID from localStorage
+    const user = getUser();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers as HeadersInit,
+    };
+    
+    // Add user ID to headers if user is logged in
+    if (user && user.id) {
+      headers['X-User-Id'] = user.id.toString();
+    }
+    
+    const res = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+    
     if (!res.ok) {
       throw new Error(`API Error: ${res.status} ${res.statusText}`);
     }

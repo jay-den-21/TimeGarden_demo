@@ -41,9 +41,14 @@ export const login = async (email: string, password: string): Promise<AuthRespon
       };
     }
 
+    // Store user data
+    if (data.user) {
+      setUser(data.user);
+    }
+    
     return {
       success: true,
-      token: data.token,
+      token: data.token || 'authenticated',
       user: data.user,
     };
   } catch (error: any) {
@@ -76,9 +81,14 @@ export const register = async (userData: RegisterData): Promise<AuthResponse> =>
       };
     }
 
+    // Store user data
+    if (data.user) {
+      setUser(data.user);
+    }
+    
     return {
       success: true,
-      token: data.token,
+      token: data.token || 'authenticated',
       user: data.user,
     };
   } catch (error: any) {
@@ -94,14 +104,34 @@ export const register = async (userData: RegisterData): Promise<AuthResponse> =>
  */
 export const logout = (): void => {
   localStorage.removeItem('token');
-  window.location.href = '/login';
+  localStorage.removeItem('user');
+  window.location.href = '/#/login';
 };
 
 /**
  * Check if user is authenticated
  */
 export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('token');
+  return !!localStorage.getItem('token') || !!localStorage.getItem('user');
+};
+
+/**
+ * Store user data after login/register
+ */
+export const setUser = (user: any): void => {
+  localStorage.setItem('user', JSON.stringify(user));
+  // Set a simple token to indicate authentication
+  if (!localStorage.getItem('token')) {
+    localStorage.setItem('token', 'authenticated');
+  }
+};
+
+/**
+ * Get stored user data
+ */
+export const getUser = (): any | null => {
+  const userStr = localStorage.getItem('user');
+  return userStr ? JSON.parse(userStr) : null;
 };
 
 /**
