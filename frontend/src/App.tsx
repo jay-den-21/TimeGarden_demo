@@ -16,8 +16,14 @@ import { isAuthenticated } from './services/authService';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
-  // For now, we'll allow access (since we don't have full auth yet)
-  // In production, check: if (!isAuthenticated()) return <Navigate to="/login" />;
+  const isAuth = isAuthenticated();
+  
+  if (!isAuth) {
+    //if not login to /login
+    return <Navigate to="/login" replace />;
+  }
+  
+  // if login show page
   return children;
 };
 

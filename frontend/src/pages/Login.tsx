@@ -17,12 +17,14 @@ const Login: React.FC = () => {
 
     try {
       const result = await login(email, password);
+      
       if (result.success) {
-        // User data is already stored by authService
-        // Redirect to dashboard
-        navigate('/');
-        // Trigger a custom event to notify Layout component
+        // CRITICAL STEP: Notify the Layout component that the auth state has changed
+        // This triggers the header to update and show the username/logout button
         window.dispatchEvent(new Event('auth-state-changed'));
+        
+        // Redirect to the dashboard
+        navigate('/');
       } else {
         setError(result.message || 'Login failed');
       }
@@ -130,4 +132,3 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-

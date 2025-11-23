@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Search, 
@@ -41,61 +41,78 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ to, icon: Icon, label, active
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // State for user data and authentication status
   const [user, setUser] = useState<User | null>(null);
   const [wallet, setWallet] = useState<WalletData>({ balance: 0, escrowBalance: 0 });
   const [authenticated, setAuthenticated] = useState(false);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const authStatus = isAuthenticated();
-      setAuthenticated(authStatus);
-      
-      if (authStatus) {
-        // First try to get user from localStorage (faster)
-        const storedUser = getUser();
-        if (storedUser) {
-          setUser(storedUser);
-        }
-        
-        // Then fetch from API to get latest data
-        try {
-          const userData = await getCurrentUser();
-          setUser(userData);
-          const walletData = await getWalletData();
-          setWallet(walletData);
-        } catch (error) {
-          // If API fails but we have stored user, keep using it
-          if (!storedUser) {
-            setAuthenticated(false);
-          }
-        }
-      } else {
-        setUser(null);
-        setWallet({ balance: 0, escrowBalance: 0 });
-      }
-    };
+  // Function to check current authentication status and load data
+  const checkAuth = async () => {
+    const authStatus = isAuthenticated();
+    setAuthenticated(authStatus);
     
+    if (authStatus) {
+      // 1. Try to get user from localStorage first (synchronous & fast)
+      const storedUser = getUser();
+      if (storedUser) {
+        setUser(storedUser);
+      }
+      
+      // 2. Fetch fresh data from API (asynchronous)
+      try {
+        // We try to fetch wallet data only if we have a valid user
+        // If the backend is not running perfectly, this might fail, so we catch it.
+        const walletData = await getWalletData();
+        setWallet(walletData);
+        
+        // Optionally refresh user data from server
+        const userData = await getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.log("API fetch skipped or failed, using local data.");
+      }
+    } else {
+      // Reset state if not authenticated
+      setUser(null);
+      setWallet({ balance: 0, escrowBalance: 0 });
+    }
+  };
+
+  useEffect(() => {
+    // Run check on mount
     checkAuth();
     
-    // Listen for auth state changes (login/register/logout)
+    // Listen for custom event triggered by Login or Logout actions
     const handleAuthChange = () => {
       checkAuth();
     };
     
     window.addEventListener('auth-state-changed', handleAuthChange);
     
+    // Cleanup listener on unmount
     return () => {
       window.removeEventListener('auth-state-changed', handleAuthChange);
     };
   }, []);
 
+  // Handle Logout Action
   const handleLogout = () => {
+    // 1. Clear local storage tokens
     logout();
+    
+    // 2. Reset local state
     setUser(null);
     setWallet({ balance: 0, escrowBalance: 0 });
     setAuthenticated(false);
+    
+    // 3. Notify other components that auth state has changed
+    window.dispatchEvent(new Event('auth-state-changed'));
+    
+    // 4. Redirect to login page
+    navigate('/login');
   };
 
   const navItems = [
@@ -166,6 +183,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
           <div className="flex items-center space-x-6">
             {authenticated && user ? (
+              // Logged In State
               <>
                 <div className="flex flex-col items-end">
                   <span className="text-sm font-semibold text-gray-900">{wallet.balance.toFixed(2)} TC</span>
@@ -181,13 +199,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </button>
 
                 <div className="flex items-center space-x-2 pl-4 border-l border-gray-200">
+                  {/* User Avatar (Initials) */}
                   <div className="w-9 h-9 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {user.displayName.charAt(0) || '?'}
+                    {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
                   </div>
-                  <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                  <span className="text-sm font-medium text-gray-700">{user.displayName || user.name}</span>
+                  
+                  {/* Logout Button */}
                   <button
                     onClick={handleLogout}
-                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                    className="p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 rounded-full transition-colors"
                     title="Logout"
                   >
                     <LogOut size={18} />
@@ -195,6 +216,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </div>
               </>
             ) : (
+              // Logged Out State
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
