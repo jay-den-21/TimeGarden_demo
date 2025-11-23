@@ -199,9 +199,64 @@ const updateProposalStatus = async (req, res) => {
   }
 };
 
+/**
+ * Delete a proposal
+ * Only the applicant can delete their own proposal (if it's still pending)
+ */
+const deleteProposal = async (req, res) => {
+  try {
+    const proposalId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (!proposalId || isNaN(proposalId)) {
+      return res.status(400).json({ error: 'Invalid proposal ID' });
+    }
+
+    // Verify proposal exists and belongs to the user
+    const [proposals] = await pool.query(
+      'SELECT id, applicant_id, status FROM proposals WHERE id = ?',
+      [proposalId]
+    );
+
+    if (proposals.length === 0) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+
+    const proposal = proposals[0];
+
+    // Check if user is the applicant
+    if (proposal.applicant_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own proposals' });
+    }
+
+    // Check if proposal is already accepted or has a contract
+    if (proposal.status === 'accepted') {
+      // Check if there's an active contract
+      const [contracts] = await pool.query(
+        'SELECT id FROM contracts WHERE proposal_id = ?',
+        [proposalId]
+      );
+      if (contracts.length > 0) {
+        return res.status(400).json({ 
+          error: 'Cannot delete accepted proposal with active contract' 
+        });
+      }
+    }
+
+    // Delete the proposal
+    await pool.query('DELETE FROM proposals WHERE id = ?', [proposalId]);
+
+    res.json({ success: true, message: 'Proposal deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getMyProposals,
   getProposalsForTask,
   createProposal,
-  updateProposalStatus
+  updateProposalStatus,
+  deleteProposal
 };

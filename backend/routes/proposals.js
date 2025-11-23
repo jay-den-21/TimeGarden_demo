@@ -8,4 +8,5 @@ router.post('/', getCurrentUserId, proposalsController.createProposal);  // Move
 router.get('/task/:taskId', proposalsController.getProposalsForTask);
 // Route to handle proposal status updates (Accept/Reject)
 router.patch('/:id/status', getCurrentUserId, proposalsController.updateProposalStatus);
+router.delete('/:id', getCurrentUserId, proposalsController.deleteProposal);
 module.exports = router;

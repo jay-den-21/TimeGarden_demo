@@ -221,9 +221,64 @@ const createTask = async (req, res) => {
   }
 };
 
+/**
+ * Delete a task
+ * Only the task poster can delete their own task
+ */
+const deleteTask = async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (!taskId || isNaN(taskId)) {
+      return res.status(400).json({ error: 'Invalid task ID' });
+    }
+
+    // Verify task exists and belongs to the user
+    const [tasks] = await pool.query(
+      'SELECT id, poster_id, status FROM tasks WHERE id = ?',
+      [taskId]
+    );
+
+    if (tasks.length === 0) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const task = tasks[0];
+
+    // Check if user is the poster
+    if (task.poster_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own tasks' });
+    }
+
+    // Check if task has active contracts (should not delete tasks with active contracts)
+    const [activeContracts] = await pool.query(
+      `SELECT COUNT(*) as count FROM contracts c 
+       JOIN proposals p ON c.proposal_id = p.id 
+       WHERE p.task_id = ? AND c.status IN ('active', 'in_progress', 'awaiting_escrow', 'awaiting_review')`,
+      [taskId]
+    );
+
+    if (activeContracts[0].count > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete task with active contracts. Please cancel contracts first.' 
+      });
+    }
+
+    // Delete the task (CASCADE will handle related records)
+    await pool.query('DELETE FROM tasks WHERE id = ?', [taskId]);
+
+    res.json({ success: true, message: 'Task deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getAllTasks,
   getMyTasks,
   getTaskById,
-  createTask
+  createTask,
+  deleteTask
 };

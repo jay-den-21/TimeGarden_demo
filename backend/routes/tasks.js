@@ -5,8 +5,9 @@ const { getCurrentUserId } = require('../middleware/auth');
 
 router.get('/', tasksController.getAllTasks);
 router.get('/my', getCurrentUserId, tasksController.getMyTasks);
-router.get('/:id', tasksController.getTaskById);
 router.post('/', getCurrentUserId, tasksController.createTask);
+router.delete('/:id', getCurrentUserId, tasksController.deleteTask);
+router.get('/:id', tasksController.getTaskById);
 
 module.exports = router;
 

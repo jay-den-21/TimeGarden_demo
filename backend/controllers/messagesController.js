@@ -223,9 +223,75 @@ const initiateThread = async (req, res) => {
   }
 };
 
+/**
+ * Delete a message
+ * Only the message sender can delete their own message
+ */
+const deleteMessage = async (req, res) => {
+  try {
+    const messageId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (!messageId || isNaN(messageId)) {
+      return res.status(400).json({ error: 'Invalid message ID' });
+    }
+
+    // Verify message exists and belongs to the user
+    const [messages] = await pool.query(
+      'SELECT id, user_id, thread_id FROM messages WHERE id = ?',
+      [messageId]
+    );
+
+    if (messages.length === 0) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    const message = messages[0];
+
+    // Check if user is the sender
+    if (message.user_id !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own messages' });
+    }
+
+    // Delete the message
+    await pool.query('DELETE FROM messages WHERE id = ?', [messageId]);
+
+    // Update thread's last_message_at if this was the last message
+    const [remainingMessages] = await pool.query(
+      'SELECT id, created_at FROM messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 1',
+      [message.thread_id]
+    );
+
+    if (remainingMessages.length > 0) {
+      await pool.query(
+        'UPDATE threads SET last_message_at = ? WHERE id = ?',
+        [remainingMessages[0].created_at, message.thread_id]
+      );
+    } else {
+      // If no messages left, update to current time
+      await pool.query(
+        'UPDATE threads SET last_message_at = NOW() WHERE id = ?',
+        [message.thread_id]
+      );
+    }
+
+    // Emit deletion event via Socket.io if available
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`thread:${message.thread_id}`).emit('message_deleted', { messageId });
+    }
+
+    res.json({ success: true, message: 'Message deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getThreads,
   getThreadMessages,
   sendMessage,
-  initiateThread 
+  initiateThread,
+  deleteMessage
 };

@@ -126,6 +126,15 @@ export const sendMessage = async (threadId: number, text: string): Promise<ChatM
   return message;
 };
 
+/**
+ * Delete a message
+ */
+export const deleteMessage = async (messageId: number): Promise<{ success: boolean; message: string }> => {
+  return fetchAPI(`/messages/${messageId}`, {
+    method: 'DELETE',
+  });
+};
+
 export const getReviewsForUser = async (userId: number): Promise<Review[]> => {
   return fetchAPI<Review[]>(`/reviews/user/${userId}`);
 };
@@ -141,6 +150,15 @@ export const createTask = async (taskData: {
   return fetchAPI<Task>('/tasks', {
     method: 'POST',
     body: JSON.stringify(taskData),
+  });
+};
+
+/**
+ * Delete a task
+ */
+export const deleteTask = async (taskId: number): Promise<{ success: boolean; message: string }> => {
+  return fetchAPI(`/tasks/${taskId}`, {
+    method: 'DELETE',
   });
 };
 
@@ -162,6 +180,15 @@ export const updateProposalStatus = async (id: number, status: 'accepted' | 'rej
   return fetchAPI(`/proposals/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+};
+
+/**
+ * Delete a proposal
+ */
+export const deleteProposal = async (proposalId: number): Promise<{ success: boolean; message: string }> => {
+  return fetchAPI(`/proposals/${proposalId}`, {
+    method: 'DELETE',
   });
 };
 
