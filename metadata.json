@@ -1,0 +1,5 @@
+{
+  "name": "TimeGarden",
+  "description": "A university-focused task delegation platform using Time Coins (TC). Features AI pricing recommendations, escrow protection, and a no-bargaining model.",
+  "requestFramePermissions": []
+}
