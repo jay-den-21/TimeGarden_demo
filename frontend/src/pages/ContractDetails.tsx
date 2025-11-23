@@ -24,19 +24,21 @@ const ContractDetails: React.FC = () => {
   const handleUpdateStatus = async (newStatus: string) => {
     if (!contract) return;
     
-    // Set action name for confirmation message based on the new status
     const actionName = newStatus === 'completed' ? 'release funds' : 'mark as delivered';
-    
     if (!confirm(`Are you sure you want to ${actionName}?`)) return;
 
     try {
       setLoading(true);
-      // Call API to update status
       await updateContractStatus(contract.id, newStatus);
       
-      // Refresh data to show updated status and progress bar
+      // Refresh data to update UI/Progress bar
       const updated = await getContractById(contract.id);
       setContract(updated);
+      
+      
+      //  Layout get TC Balance
+      window.dispatchEvent(new Event('auth-state-changed'));
+
       setLoading(false);
       alert("Status updated successfully!");
     } catch (error) {

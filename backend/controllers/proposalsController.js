@@ -129,48 +129,57 @@ const updateProposalStatus = async (req, res) => {
     await connection.beginTransaction();
 
     const proposalId = req.params.id;
-    const { status } = req.body; // 'accepted' or 'rejected'
+    const { status } = req.body; 
     
-    // 1. Update the proposal status
+    // 1. Update proposal status
     await connection.query(
       'UPDATE proposals SET status = ? WHERE id = ?',
       [status, proposalId]
     );
 
-    // 2. If accepted, create a new contract automatically
     if (status === 'accepted') {
-      // Fetch proposal details to get applicant_id (Provider)
-      const [proposals] = await connection.query(
-        'SELECT * FROM proposals WHERE id = ?', 
-        [proposalId]
-      );
-      
-      if (proposals.length === 0) {
-        throw new Error('Proposal not found');
-      }
+      // Get proposal details
+      const [proposals] = await connection.query('SELECT * FROM proposals WHERE id = ?', [proposalId]);
+      if (proposals.length === 0) throw new Error('Proposal not found');
       const proposal = proposals[0];
 
-      // Fetch task details to get poster_id (Requester) and deadline
-      const [tasks] = await connection.query(
-        'SELECT poster_id, deadline FROM tasks WHERE id = ?',
-        [proposal.task_id]
-      );
+      // Get task details
+      const [tasks] = await connection.query('SELECT poster_id, deadline FROM tasks WHERE id = ?', [proposal.task_id]);
       const task = tasks[0];
 
-      // Insert new contract into database
+      
+      // check money
+      const [requesterWallet] = await connection.query('SELECT balance FROM wallets WHERE user_id = ?', [task.poster_id]);
+      if (requesterWallet.length === 0 || requesterWallet[0].balance < proposal.amount) {
+        throw new Error('Insufficient funds to accept this proposal'); // 余额不足报错
+      }
+
+      // Deduct available balance -> Transfer to escrow balance
+      await connection.query(
+        'UPDATE wallets SET balance = balance - ?, escrow_balance = escrow_balance + ? WHERE user_id = ?',
+        [proposal.amount, proposal.amount, task.poster_id]
+      );
+
+      // Record this 'funds lock' transaction
+      await connection.query(
+        'INSERT INTO transactions (wallet_id, amount, type, description, status) VALUES (?, ?, "escrow_lock", ?, "success")',
+        [task.poster_id, -proposal.amount, `Funds locked for Task #${proposal.task_id}`]
+      );
+
+      // Create Contract
       await connection.query(`
         INSERT INTO contracts 
         (proposal_id, requester_id, provider_id, amount, status, start_date, end_date)
         VALUES (?, ?, ?, ?, 'active', NOW(), ?)
       `, [
         proposalId, 
-        task.poster_id, // Requester (The one who posted the task)
-        proposal.applicant_id, // Provider (The one who applied)
+        task.poster_id, 
+        proposal.applicant_id, 
         proposal.amount,
         task.deadline || null
       ]);
       
-      // Update task status to 'in_progress'
+      // Update task status
       await connection.query(
         'UPDATE tasks SET status = "in_progress" WHERE id = ?',
         [proposal.task_id]
@@ -183,7 +192,8 @@ const updateProposalStatus = async (req, res) => {
   } catch (err) {
     await connection.rollback();
     console.error(err);
-    res.status(500).json({ error: 'Database error or Proposal not found' });
+    // Return specific error messages to the frontend (e.g., insufficient balance)
+    res.status(500).json({ error: err.message || 'Database error' });
   } finally {
     connection.release();
   }

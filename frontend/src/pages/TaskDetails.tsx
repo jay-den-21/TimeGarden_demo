@@ -56,6 +56,10 @@ const TaskDetails: React.FC = () => {
         getProposalsForTask(task.id).then(setProposals);
         if (status === 'accepted') {
            getTaskById(task.id).then(setTask);
+
+           // Layout get balance
+           window.dispatchEvent(new Event('auth-state-changed'));
+           
            alert("Proposal accepted! A new contract has been created.");
         }
       }

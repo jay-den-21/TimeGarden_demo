@@ -1,11 +1,15 @@
+// backend/controllers/tasksController.js
+
 const pool = require('../config/database');
 const { normalizeStatus } = require('../utils/statusNormalizer');
 
 /**
- * Get all tasks
+ * Get all OPEN tasks (For Browse Page)
+ * Only shows tasks that haven't been started yet.
  */
 const getAllTasks = async (req, res) => {
   try {
+    // [Fix 1] Added WHERE t.status = 'open' to hide in-progress/completed tasks
     const query = `
       SELECT t.id, t.title, t.description, t.budget, date_format(t.deadline, "%Y-%m-%d") as deadline, 
              t.status, t.category, date_format(t.created_at, "%Y-%m-%d") as createdAt, 
@@ -13,10 +17,12 @@ const getAllTasks = async (req, res) => {
              (SELECT COUNT(*) FROM proposals p WHERE p.task_id = t.id) as proposalsCount
       FROM tasks t
       JOIN users u ON t.poster_id = u.id
+      WHERE t.status = 'open' 
+      ORDER BY t.created_at DESC
     `;
     const [tasks] = await pool.query(query);
     
-    // Fetch skills and normalize status
+    // Fetch skills for each task
     for (let task of tasks) {
       task.status = normalizeStatus(task.status);
       const [skills] = await pool.query(
@@ -34,7 +40,8 @@ const getAllTasks = async (req, res) => {
 };
 
 /**
- * Get tasks posted by current user
+ * Get tasks posted by current user (Dashboard)
+ * Shows ALL statuses (open, in_progress, completed, etc.)
  */
 const getMyTasks = async (req, res) => {
   try {
@@ -47,6 +54,7 @@ const getMyTasks = async (req, res) => {
       FROM tasks t
       JOIN users u ON t.poster_id = u.id
       WHERE t.poster_id = ?
+      ORDER BY t.created_at DESC
     `;
     const [tasks] = await pool.query(query, [userId]);
     
@@ -88,6 +96,7 @@ const getTaskById = async (req, res) => {
     const task = rows[0];
     task.status = normalizeStatus(task.status);
     
+    // [Fix 2] Ensure skills are fetched correctly
     const [skills] = await pool.query(
       'SELECT s.name FROM skills s JOIN task_skills ts ON s.id = ts.skill_id WHERE ts.task_id = ?',
       [task.id]
@@ -107,17 +116,18 @@ const getTaskById = async (req, res) => {
   }
 };
 
+/**
+ * Create a new task
+ */
 const createTask = async (req, res) => {
   try {
     const { title, description, budget, deadline, category, skills } = req.body;
     const userId = req.userId;
 
-    // Validation
     if (!title || !description || !budget) {
       return res.status(400).json({ error: 'Title, description, and budget are required' });
     }
 
-    // Insert task
     const [result] = await pool.query(
       'INSERT INTO tasks (poster_id, title, description, budget, deadline, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [userId, title, description, budget, deadline || null, category || 'Tech', 'open']
@@ -125,27 +135,27 @@ const createTask = async (req, res) => {
 
     const taskId = result.insertId;
 
-    // Handle skills - insert or find existing skills and link them
-    if (skills && skills.length > 0) {
+    // Insert skills if provided
+    if (skills && Array.isArray(skills) && skills.length > 0) {
       for (const skillName of skills) {
-        // Check if skill exists
+        // 1. Check if skill exists
         let [existingSkills] = await pool.query('SELECT id FROM skills WHERE name = ?', [skillName]);
         let skillId;
 
         if (existingSkills.length === 0) {
-          // Create new skill
+          // 2. Create if not exists
           const [skillResult] = await pool.query('INSERT INTO skills (name, category) VALUES (?, ?)', [skillName, category || 'Tech']);
           skillId = skillResult.insertId;
         } else {
           skillId = existingSkills[0].id;
         }
 
-        // Link skill to task
-        await pool.query('INSERT INTO task_skills (task_id, skill_id) VALUES (?, ?)', [taskId, skillId]);
+        // 3. Link to task
+        // Use IGNORE to prevent duplicate key errors if frontend sends duplicate skills
+        await pool.query('INSERT IGNORE INTO task_skills (task_id, skill_id) VALUES (?, ?)', [taskId, skillId]);
       }
     }
 
-    // Return created task
     const [newTask] = await pool.query(
       'SELECT t.*, u.display_name as publisherName FROM tasks t JOIN users u ON t.poster_id = u.id WHERE t.id = ?',
       [taskId]
@@ -164,4 +174,3 @@ module.exports = {
   getTaskById,
   createTask
 };
-
