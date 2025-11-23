@@ -9,9 +9,13 @@ import {
   Bell, 
   Menu,
   X,
-  Briefcase
+  Briefcase,
+  LogOut,
+  LogIn,
+  UserPlus
 } from 'lucide-react';
 import { getCurrentUser, getWalletData } from '../services/mockDatabase';
+import { logout, isAuthenticated } from '../services/authService';
 import { User, WalletData } from '../types';
 
 interface SidebarItemProps {
@@ -41,11 +45,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
   const [user, setUser] = useState<User | null>(null);
   const [wallet, setWallet] = useState<WalletData>({ balance: 0, escrowBalance: 0 });
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    getCurrentUser().then(setUser);
-    getWalletData().then(setWallet);
+    const checkAuth = async () => {
+      const authStatus = isAuthenticated();
+      setAuthenticated(authStatus);
+      
+      if (authStatus) {
+        try {
+          const userData = await getCurrentUser();
+          setUser(userData);
+          const walletData = await getWalletData();
+          setWallet(walletData);
+        } catch (error) {
+          // If API fails, user might not be logged in
+          setAuthenticated(false);
+        }
+      }
+    };
+    checkAuth();
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    setWallet({ balance: 0, escrowBalance: 0 });
+    setAuthenticated(false);
+  };
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -66,7 +93,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
           <span className="font-bold text-xl text-gray-800">TimeGarden</span>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          title={isMobileMenuOpen ? "Close menu" : "Open menu"}
+          aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+        >
           {isMobileMenuOpen ? <X /> : <Menu />}
         </button>
       </div>
@@ -110,22 +141,53 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
 
           <div className="flex items-center space-x-6">
-            <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold text-gray-900">{wallet.balance.toFixed(2)} TC</span>
-              <span className="text-xs text-green-600 font-medium">Available</span>
-            </div>
-            
-            <button className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
+            {authenticated && user ? (
+              <>
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-semibold text-gray-900">{wallet.balance.toFixed(2)} TC</span>
+                  <span className="text-xs text-green-600 font-medium">Available</span>
+                </div>
+                
+                <button 
+                  className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Notifications"
+                >
+                  <Bell size={20} />
+                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                </button>
 
-            <div className="flex items-center space-x-2 pl-4 border-l border-gray-200">
-              <div className="w-9 h-9 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">
-                {user?.displayName.charAt(0) || '?'}
+                <div className="flex items-center space-x-2 pl-4 border-l border-gray-200">
+                  <div className="w-9 h-9 bg-amber-500 rounded-full flex items-center justify-center text-white font-bold">
+                    {user.displayName.charAt(0) || '?'}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{user.name}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                    title="Logout"
+                  >
+                    <LogOut size={18} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <Link
+                  to="/login"
+                  className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <LogIn size={18} />
+                  <span>Sign In</span>
+                </Link>
+                <Link
+                  to="/register"
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  <UserPlus size={18} />
+                  <span>Sign Up</span>
+                </Link>
               </div>
-              <span className="text-sm font-medium text-gray-700">{user?.name || 'Loading...'}</span>
-            </div>
+            )}
           </div>
         </header>
 

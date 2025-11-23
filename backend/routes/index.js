@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
+const authRoutes = require('./auth');
 const usersRoutes = require('./users');
 const walletRoutes = require('./wallet');
 const transactionsRoutes = require('./transactions');
@@ -16,6 +17,7 @@ router.get('/health', (req, res) => {
 });
 
 // API routes
+router.use('/auth', authRoutes);
 router.use('/users', usersRoutes);
 router.use('/wallet', walletRoutes);
 router.use('/transactions', transactionsRoutes);
