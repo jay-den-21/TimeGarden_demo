@@ -1,20 +1,36 @@
 import React, { useState } from 'react';
 import { getPriceRecommendation, PriceRecommendation, RecommendationResult } from '../services/geminiService';
-import { Loader2, Sparkles, Info, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, Sparkles, Info, AlertTriangle, XCircle, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { createTask } from '../services/mockDatabase';
+
+// Predefined skills list matching the database seed data
+// In a real app, this should be fetched from an API (e.g., /api/skills)
+const PREDEFINED_SKILLS = [
+  'Python Programming',
+  'Graphic Design',
+  'Content Strategy',
+  'Data Analysis',
+  'Moving & Logistics',
+  'Math Tutoring',
+  'Career Coaching',
+  'Video Editing',
+  'Database Architecture',
+  'Translation - French',
+  'UX Research',
+  'Frontend Development'
+];
 
 const TaskCreate: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'Programming',
+    category: 'Tech', // Default category
     budget: '',
     deadline: '',
   });
   const [skills, setSkills] = useState<string[]>([]);
-  const [skillInput, setSkillInput] = useState('');
   
   const [loadingAI, setLoadingAI] = useState(false);
   const [recommendation, setRecommendation] = useState<PriceRecommendation | null>(null);
@@ -22,14 +38,14 @@ const TaskCreate: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAddSkill = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && skillInput.trim()) {
-      e.preventDefault();
-      if (!skills.includes(skillInput.trim())) {
-        setSkills([...skills, skillInput.trim()]);
-      }
-      setSkillInput('');
+  // Handle selecting a skill from the dropdown
+  const handleSelectSkill = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedSkill = e.target.value;
+    if (selectedSkill && !skills.includes(selectedSkill)) {
+      setSkills([...skills, selectedSkill]);
     }
+    // Reset select to default
+    e.target.value = "";
   };
 
   const removeSkill = (skill: string) => {
@@ -175,39 +191,48 @@ const TaskCreate: React.FC = () => {
                             value={formData.category}
                             onChange={e => setFormData({...formData, category: e.target.value})}
                         >
-                            <option>Programming</option>
-                            <option>Design</option>
-                            <option>Tutoring</option>
-                            <option>Writing</option>
-                            <option>Admin</option>
+                            <option value="Tech">Tech</option>
+                            <option value="Creative">Creative</option>
+                            <option value="Academic">Academic</option>
+                            <option value="Writing">Writing</option>
+                            <option value="Labor">Labor</option>
+                            <option value="Language">Language</option>
+                            <option value="Career">Career</option>
+                            <option value="Product">Product</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-             {/* Skills */}
+             {/* Skills Section - Modified to use Dropdown */}
              <div className="pt-4 border-t border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                     <span className="bg-blue-100 text-blue-700 w-6 h-6 rounded flex items-center justify-center text-xs mr-2">2</span> 
                     Required Skills
                 </h3>
                 <div>
-                    <input 
-                        type="text" 
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-2"
-                        placeholder="Type skill and press Enter (e.g., React)"
-                        value={skillInput}
-                        onChange={e => setSkillInput(e.target.value)}
-                        onKeyDown={handleAddSkill}
-                    />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Select Skills</label>
+                    <select 
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white mb-2"
+                        onChange={handleSelectSkill}
+                        defaultValue=""
+                    >
+                        <option value="" disabled>Choose a skill to add...</option>
+                        {PREDEFINED_SKILLS.map(skill => (
+                            <option key={skill} value={skill} disabled={skills.includes(skill)}>
+                                {skill}
+                            </option>
+                        ))}
+                    </select>
+                    
                     <div className="flex flex-wrap gap-2 min-h-[2rem]">
                         {skills.map(skill => (
-                        <span key={skill} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm flex items-center">
+                        <span key={skill} className="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-full text-sm flex items-center">
                             {skill}
                             <button 
                                 type="button"
                                 onClick={() => removeSkill(skill)} 
-                                className="ml-2 text-gray-400 hover:text-red-500"
+                                className="ml-2 text-blue-400 hover:text-blue-600 font-bold"
                             >
                                 ×
                             </button>
