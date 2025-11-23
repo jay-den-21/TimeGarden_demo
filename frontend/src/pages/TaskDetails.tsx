@@ -1,17 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2 } from 'lucide-react';
-import { getTaskById, getCurrentUser, getProposalsForTask } from '../services/mockDatabase';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2, X } from 'lucide-react';
+import { getTaskById, getCurrentUser, getProposalsForTask, createProposal } from '../services/mockDatabase';
 import { TaskStatus, Task, Proposal, User } from '../types';
 
 const TaskDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'overview' | 'proposals' | 'messages'>('overview');
   
   const [task, setTask] = useState<Task | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Proposal form state
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [proposalAmount, setProposalAmount] = useState('');
+  const [proposalMessage, setProposalMessage] = useState('');
+  const [submittingProposal, setSubmittingProposal] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -28,6 +36,52 @@ const TaskDetails: React.FC = () => {
       });
     }
   }, [id]);
+
+  const handleSubmitProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProposalError(null);
+
+    if (!task || !currentUser) {
+      setProposalError('You must be logged in to submit a proposal');
+      return;
+    }
+
+    if (!proposalAmount || !proposalMessage) {
+      setProposalError('Please fill in all fields');
+      return;
+    }
+
+    const amount = Number(proposalAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setProposalError('Please enter a valid amount');
+      return;
+    }
+
+    setSubmittingProposal(true);
+
+    try {
+      await createProposal({
+        taskId: task.id,
+        amount: amount,
+        message: proposalMessage,
+      });
+      
+      // Success - close modal, refresh proposals, show success message
+      setShowProposalModal(false);
+      setProposalAmount('');
+      setProposalMessage('');
+      
+      // Refresh proposals list
+      getProposalsForTask(task.id).then(setProposals);
+      
+      // Optionally show success message or redirect
+      alert('Proposal submitted successfully!');
+    } catch (err: any) {
+      setProposalError(err.message || 'Failed to submit proposal. Please try again.');
+    } finally {
+      setSubmittingProposal(false);
+    }
+  };
 
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>;
 
@@ -197,13 +251,110 @@ const TaskDetails: React.FC = () => {
                 <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-xl text-white shadow-lg">
                     <h4 className="font-bold text-lg mb-2">Interested?</h4>
                     <p className="text-blue-100 text-sm mb-6">Submit a proposal to apply for this task. Your Time Coins are protected by escrow.</p>
-                    <button className="w-full bg-white text-blue-600 py-3 rounded-lg font-bold shadow-sm hover:bg-blue-50 transition-colors">
+                    <button 
+                        onClick={() => setShowProposalModal(true)}
+                        className="w-full bg-white text-blue-600 py-3 rounded-lg font-bold shadow-sm hover:bg-blue-50 transition-colors"
+                    >
                         Apply Now
                     </button>
                 </div>
             )}
         </div>
       </div>
+
+      {/* Proposal Modal */}
+      {showProposalModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-900">Submit Your Proposal</h3>
+              <button
+                onClick={() => {
+                  setShowProposalModal(false);
+                  setProposalError(null);
+                  setProposalAmount('');
+                  setProposalMessage('');
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitProposal} className="p-6 space-y-6">
+              {proposalError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {proposalError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Bid Amount (Time Coins) *
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={task.budget}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={`Max: ${task.budget} TC`}
+                    value={proposalAmount}
+                    onChange={(e) => setProposalAmount(e.target.value)}
+                    required
+                  />
+                  <span className="absolute right-3 top-2.5 text-gray-500">TC</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Task budget: {task.budget} TC</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cover Letter *
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32"
+                  placeholder="Explain why you're the right person for this task. Include your relevant experience and approach..."
+                  value={proposalMessage}
+                  onChange={(e) => setProposalMessage(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">This will be visible to the task owner</p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProposalModal(false);
+                    setProposalError(null);
+                    setProposalAmount('');
+                    setProposalMessage('');
+                  }}
+                  className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingProposal}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {submittingProposal ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2" size={18} />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Proposal'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

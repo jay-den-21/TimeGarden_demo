@@ -25,7 +25,19 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise
     });
     
     if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      // Try to extract error message from response body
+      let errorMessage = `API Error: ${res.status} ${res.statusText}`;
+      try {
+        const errorData = await res.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+      } catch (e) {
+        // If response isn't JSON, use the status text
+      }
+      throw new Error(errorMessage);
     }
     const data = await res.json();
     return data;
@@ -119,5 +131,16 @@ export const createTask = async (taskData: {
   return fetchAPI<Task>('/tasks', {
     method: 'POST',
     body: JSON.stringify(taskData),
+  });
+};
+
+export const createProposal = async (proposalData: {
+  taskId: number;
+  amount: number;
+  message: string;
+}): Promise<Proposal> => {
+  return fetchAPI<Proposal>('/proposals', {
+    method: 'POST',
+    body: JSON.stringify(proposalData),
   });
 };

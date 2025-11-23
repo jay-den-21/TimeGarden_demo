@@ -107,9 +107,61 @@ const getTaskById = async (req, res) => {
   }
 };
 
+const createTask = async (req, res) => {
+  try {
+    const { title, description, budget, deadline, category, skills } = req.body;
+    const userId = req.userId;
+
+    // Validation
+    if (!title || !description || !budget) {
+      return res.status(400).json({ error: 'Title, description, and budget are required' });
+    }
+
+    // Insert task
+    const [result] = await pool.query(
+      'INSERT INTO tasks (poster_id, title, description, budget, deadline, category, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, title, description, budget, deadline || null, category || 'Tech', 'open']
+    );
+
+    const taskId = result.insertId;
+
+    // Handle skills - insert or find existing skills and link them
+    if (skills && skills.length > 0) {
+      for (const skillName of skills) {
+        // Check if skill exists
+        let [existingSkills] = await pool.query('SELECT id FROM skills WHERE name = ?', [skillName]);
+        let skillId;
+
+        if (existingSkills.length === 0) {
+          // Create new skill
+          const [skillResult] = await pool.query('INSERT INTO skills (name, category) VALUES (?, ?)', [skillName, category || 'Tech']);
+          skillId = skillResult.insertId;
+        } else {
+          skillId = existingSkills[0].id;
+        }
+
+        // Link skill to task
+        await pool.query('INSERT INTO task_skills (task_id, skill_id) VALUES (?, ?)', [taskId, skillId]);
+      }
+    }
+
+    // Return created task
+    const [newTask] = await pool.query(
+      'SELECT t.*, u.display_name as publisherName FROM tasks t JOIN users u ON t.poster_id = u.id WHERE t.id = ?',
+      [taskId]
+    );
+
+    res.status(201).json(newTask[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getAllTasks,
   getMyTasks,
-  getTaskById
+  getTaskById,
+  createTask
 };
 
