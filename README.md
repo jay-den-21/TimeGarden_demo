@@ -48,7 +48,7 @@ cd ../backend && npm install
 
 **前端配置** (`frontend/.env.local`):
 ```
-VITE_API_KEY=your_gemini_api_key
+API_KEY=your_gemini_api_key
 ```
 
 **后端配置** (`backend/.env`):
@@ -58,6 +58,7 @@ DB_USER=root
 DB_PASSWORD=
 DB_NAME=TimeGarden
 DB_PORT=3306
+API_KEY=your_gemini_api_key
 ```
 
 ### 初始化数据库
