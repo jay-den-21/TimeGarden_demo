@@ -154,3 +154,13 @@ export const updateProposalStatus = async (id: number, status: 'accepted' | 'rej
     body: JSON.stringify({ status }),
   });
 };
+
+/**
+ * Update contract status (delivered/completed)
+ */
+export const updateContractStatus = async (id: number, status: string): Promise<any> => {
+  return fetchAPI(`/contracts/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+};

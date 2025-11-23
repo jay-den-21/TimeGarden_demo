@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { CheckCircle, Lock, FileText, Upload, Shield, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 import { ContractStatus, Contract } from '../types';
-import { getContractById } from '../services/mockDatabase';
+import { getContractById, updateContractStatus } from '../services/mockDatabase';
 import { getUser } from '../services/authService';
 
 const ContractDetails: React.FC = () => {
@@ -20,13 +20,38 @@ const ContractDetails: React.FC = () => {
     }
   }, [id]);
 
+  // Function to handle contract status updates (Mark as Delivered / Release Funds)
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!contract) return;
+    
+    // Set action name for confirmation message based on the new status
+    const actionName = newStatus === 'completed' ? 'release funds' : 'mark as delivered';
+    
+    if (!confirm(`Are you sure you want to ${actionName}?`)) return;
+
+    try {
+      setLoading(true);
+      // Call API to update status
+      await updateContractStatus(contract.id, newStatus);
+      
+      // Refresh data to show updated status and progress bar
+      const updated = await getContractById(contract.id);
+      setContract(updated);
+      setLoading(false);
+      alert("Status updated successfully!");
+    } catch (error) {
+      setLoading(false);
+      alert("Failed to update contract status.");
+    }
+  };
+
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>;
 
   if (!contract) {
       return <div className="p-8 text-center">Contract not found.</div>;
   }
 
-  // Logic to determine steps based on status
+  // Logic to determine steps based on status for the progress bar
   const steps = [
     { id: 1, label: 'Unfunded', icon: FileText, done: true },
     { id: 2, label: 'In Escrow', icon: Lock, done: contract.status !== ContractStatus.AWAITING_ESCROW },
@@ -109,9 +134,28 @@ const ContractDetails: React.FC = () => {
                            <input type="file" className="hidden" />
                        </div>
                        
+                       {/* Action Button Area */}
                        <div className="mt-4">
-                           <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors">
-                               {isRequester ? 'Review & Release Funds' : 'Mark as Delivered'}
+                           <button 
+                               onClick={() => {
+                                   // If user is Requester -> Complete contract (Release funds)
+                                   // If user is Provider -> Mark as Delivered
+                                   if (isRequester) {
+                                       handleUpdateStatus('completed'); 
+                                   } else {
+                                       handleUpdateStatus('delivered');
+                                   }
+                               }}
+                               disabled={contract.status === 'completed'}
+                               className={`w-full py-2 rounded-lg font-medium transition-colors ${
+                                   contract.status === 'completed' 
+                                   ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                   : 'bg-blue-600 hover:bg-blue-700 text-white'
+                               }`}
+                           >
+                               {contract.status === 'completed' 
+                                   ? 'Contract Closed' 
+                                   : isRequester ? 'Review & Release Funds' : 'Mark as Delivered'}
                            </button>
                        </div>
                    </div>
