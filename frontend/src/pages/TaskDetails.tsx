@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2, X } from 'lucide-react';
-// Ensure updateProposalStatus is imported
-import { getTaskById, getCurrentUser, getProposalsForTask, createProposal, updateProposalStatus } from '../services/mockDatabase';
+// Ensure all necessary functions are imported, including initiateThread
+import { 
+  getTaskById, 
+  getCurrentUser, 
+  getProposalsForTask, 
+  createProposal, 
+  updateProposalStatus, 
+  initiateThread // <--- Imported here
+} from '../services/mockDatabase';
 import { TaskStatus, Task, Proposal, User } from '../types';
 
 const TaskDetails: React.FC = () => {
@@ -38,22 +45,15 @@ const TaskDetails: React.FC = () => {
     }
   }, [id]);
 
-  // --- NEW FUNCTION ADDED HERE ---
   // Function to handle Accept/Reject actions for proposals
   const handleStatusUpdate = async (proposalId: number, status: 'accepted' | 'rejected') => {
-    // 1. Confirm action with user
     if (!confirm(`Are you sure you want to ${status} this proposal?`)) return;
     
     try {
-      // 2. Call the backend API
       await updateProposalStatus(proposalId, status);
       
-      // 3. Refresh data to show updated status
       if (task) {
-        // Refresh proposal list to show the green/red badge
         getProposalsForTask(task.id).then(setProposals);
-        
-        // If accepted, the task status also changes to 'in_progress', so refresh task details
         if (status === 'accepted') {
            getTaskById(task.id).then(setTask);
            alert("Proposal accepted! A new contract has been created.");
@@ -64,7 +64,23 @@ const TaskDetails: React.FC = () => {
       alert("Failed to update proposal status.");
     }
   };
-  // --- END OF NEW FUNCTION ---
+
+  // --- NEW FUNCTION: Handle contacting the applicant ---
+  const handleContact = async (partnerId: number) => {
+    if (!task) return;
+    try {
+      // 1. Call backend to get existing thread ID or create a new one
+      await initiateThread(task.id, partnerId);
+      
+      // 2. Navigate to the messages page
+      // In a more advanced version, we could pass the threadId to auto-select it
+      navigate('/messages');
+    } catch (error) {
+      console.error("Error initiating thread:", error);
+      alert("Failed to start conversation. Please try again.");
+    }
+  };
+  // ----------------------------------------------------
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,15 +111,12 @@ const TaskDetails: React.FC = () => {
         message: proposalMessage,
       });
       
-      // Success - close modal, refresh proposals, show success message
       setShowProposalModal(false);
       setProposalAmount('');
       setProposalMessage('');
       
-      // Refresh proposals list
       getProposalsForTask(task.id).then(setProposals);
       
-      // Optionally show success message or redirect
       alert('Proposal submitted successfully!');
     } catch (err: any) {
       setProposalError(err.message || 'Failed to submit proposal. Please try again.');
@@ -131,7 +144,6 @@ const TaskDetails: React.FC = () => {
                     <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold capitalize">{task.category}</span>
                     <span className="flex items-center"><Clock size={14} className="mr-1"/> Posted {task.createdAt || 'Recently'}</span>
                     <span className="flex items-center"><MapPin size={14} className="mr-1"/> Remote</span>
-                    {/* Display current task status */}
                     <span className="flex items-center font-semibold capitalize text-blue-600">
                         Status: {task.status.replace('_', ' ')}
                     </span>
@@ -222,9 +234,14 @@ const TaskDetails: React.FC = () => {
                                 </div>
 
                                 <div className="flex justify-end space-x-3">
-                                    <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">Message</button>
+                                    {/* UPDATED: Message Button now calls handleContact */}
+                                    <button 
+                                        onClick={() => handleContact(proposal.applicantId)}
+                                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                                    >
+                                        Message
+                                    </button>
                                     
-                                    {/* UPDATE: Added Logic for Accept/Reject Buttons */}
                                     {proposal.status === 'pending' ? (
                                         <>
                                             <button 

@@ -7,6 +7,7 @@ const { getCurrentUserId } = require('../middleware/auth');
 router.get('/threads', getCurrentUserId, messagesController.getThreads);
 router.get('/threads/:id/messages', getCurrentUserId, messagesController.getThreadMessages);
 router.post('/threads/:id/messages', getCurrentUserId, messagesController.sendMessage);
+router.post('/threads/initiate', getCurrentUserId, messagesController.initiateThread);
 
 module.exports = router;
 

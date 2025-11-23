@@ -1,17 +1,19 @@
-import { Contract, Task, Transaction, WalletData, ChatThread, ChatMessage, Proposal, Review, User } from '../types';
+// frontend/src/services/mockDatabase.ts
 
-const API_URL = 'http://localhost:4000/api';
+import { Contract, Task, Transaction, WalletData, ChatThread, ChatMessage, Proposal, Review, User } from '../types';
 import { getUser } from './authService';
 
-// Remove the old CURRENT_USER_ID export, now using getUser() from authService
+const API_URL = 'http://localhost:4000/api';
 
 async function fetchAPI<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   try {
     // Get current user ID from localStorage
     const user = getUser();
-    const headers: HeadersInit = {
+    
+    // Record<string, string>，use ['key'] set value
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers as HeadersInit,
+      ...(options.headers as Record<string, string> || {}),
     };
     
     // Add user ID to headers if user is logged in
@@ -162,5 +164,15 @@ export const updateContractStatus = async (id: number, status: string): Promise<
   return fetchAPI(`/contracts/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  });
+};
+
+/**
+ * Initiate a new chat thread or get existing one
+ */
+export const initiateThread = async (taskId: number, partnerId: number): Promise<{ threadId: number, isNew: boolean }> => {
+  return fetchAPI('/threads/initiate', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, partnerId }),
   });
 };

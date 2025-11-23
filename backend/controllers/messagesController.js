@@ -16,6 +16,7 @@ const getThreads = async (req, res) => {
     `, [userId]);
 
     for (let thread of threads) {
+      // Get the other participant's name
       const [participants] = await pool.query(`
         SELECT u.display_name as name, u.id 
         FROM thread_participants tp 
@@ -27,6 +28,7 @@ const getThreads = async (req, res) => {
       thread.partnerName = participants.length > 0 ? participants[0].name : 'Unknown';
       thread.partnerId = participants.length > 0 ? participants[0].id : 0;
 
+      // Get the last message content
       const [msgs] = await pool.query(
         'SELECT body FROM messages WHERE thread_id = ? ORDER BY created_at DESC LIMIT 1',
         [thread.id]
@@ -49,6 +51,8 @@ const getThreadMessages = async (req, res) => {
   try {
     const threadId = req.params.id;
     const userId = req.userId;
+    
+    // Fetch messages with sender details
     const [rows] = await pool.query(`
       SELECT m.id, m.thread_id as threadId, m.user_id as senderId, m.body as text, 
              date_format(m.created_at, "%H:%i") as timestamp,
@@ -59,6 +63,7 @@ const getThreadMessages = async (req, res) => {
       ORDER BY m.created_at ASC
     `, [threadId]);
     
+    // Mark messages sent by the current user
     const messages = rows.map(r => ({
       ...r,
       isMe: r.senderId === userId
@@ -102,14 +107,13 @@ const sendMessage = async (req, res) => {
 
     const messageId = result.insertId;
 
-    // Update thread's last_message_at
+    // Update thread's last_message_at timestamp
     await pool.query(
       'UPDATE threads SET last_message_at = NOW() WHERE id = ?',
       [threadId]
     );
 
-    // Get message with user info
-    // Note: Using 'body' as per schema.sql, mapping to 'text' for frontend compatibility
+    // Get the full message object to return
     const [messages] = await pool.query(`
       SELECT m.id, m.thread_id as threadId, m.user_id as senderId, m.body as text, 
              date_format(m.created_at, "%H:%i") as timestamp,
@@ -124,16 +128,16 @@ const sendMessage = async (req, res) => {
       isMe: messages[0].senderId === userId
     };
 
-    // Emit via Socket.io if available
+    // Emit via Socket.io if available (Real-time update)
     const io = req.app.get('io');
     if (io) {
-      // Get all participants
+      // Get all participants to notify them
       const [allParticipants] = await pool.query(
         'SELECT user_id FROM thread_participants WHERE thread_id = ?',
         [threadId]
       );
 
-      // Emit to each participant with correct isMe flag
+      // Emit to each participant's personal socket room
       allParticipants.forEach(participant => {
         const participantId = participant.user_id;
         const isMe = participantId === userId;
@@ -144,7 +148,7 @@ const sendMessage = async (req, res) => {
         });
       });
 
-      // Also emit to thread room for anyone listening
+      // Also emit to thread room for anyone actively looking at this thread
       io.to(`thread:${threadId}`).emit('new_message', message);
     }
 
@@ -155,9 +159,73 @@ const sendMessage = async (req, res) => {
   }
 };
 
+/**
+ * Initiate a conversation thread.
+ * Checks if a thread exists for this task/participants; if not, creates one.
+ * This fixes the "Message" button logic on the frontend.
+ */
+const initiateThread = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { taskId, partnerId } = req.body;
+    const userId = req.userId;
+
+    // 1. Check if a thread already exists for this specific task between these two users
+    // We perform a self-join on thread_participants to find a thread containing both users
+    const [existing] = await connection.query(`
+      SELECT t.id 
+      FROM threads t
+      JOIN thread_participants tp1 ON t.id = tp1.thread_id
+      JOIN thread_participants tp2 ON t.id = tp2.thread_id
+      WHERE t.task_id = ? 
+      AND tp1.user_id = ? 
+      AND tp2.user_id = ?
+      LIMIT 1
+    `, [taskId, userId, partnerId]);
+
+    if (existing.length > 0) {
+      // Thread exists, return it directly so frontend can redirect
+      connection.release();
+      return res.json({ threadId: existing[0].id, isNew: false });
+    }
+
+    // 2. If not, start a transaction to create a new thread
+    await connection.beginTransaction();
+
+    // Create the thread entry
+    const [threadResult] = await connection.query(
+      'INSERT INTO threads (task_id, last_message_at) VALUES (?, NOW())',
+      [taskId]
+    );
+    const newThreadId = threadResult.insertId;
+
+    // Add both participants (Current User & Partner) to the thread
+    await connection.query(
+      'INSERT INTO thread_participants (thread_id, user_id, role) VALUES (?, ?, ?), (?, ?, ?)',
+      [newThreadId, userId, 'poster', newThreadId, partnerId, 'applicant']
+    );
+
+    // Insert an initial system message to make the thread visible in the list immediately
+    await connection.query(
+      'INSERT INTO messages (thread_id, user_id, body) VALUES (?, ?, ?)',
+      [newThreadId, userId, 'Started a new conversation about this task.']
+    );
+
+    await connection.commit();
+    res.status(201).json({ threadId: newThreadId, isNew: true });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 module.exports = {
   getThreads,
   getThreadMessages,
-  sendMessage
+  sendMessage,
+  initiateThread 
 };
-
