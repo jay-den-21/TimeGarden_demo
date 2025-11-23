@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { getPriceRecommendation, PriceRecommendation } from '../services/geminiService';
-import { Loader2, Sparkles, Info, AlertTriangle } from 'lucide-react';
+import { getPriceRecommendation, PriceRecommendation, RecommendationResult } from '../services/geminiService';
+import { Loader2, Sparkles, Info, AlertTriangle, XCircle } from 'lucide-react';
 
 const TaskCreate: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +15,7 @@ const TaskCreate: React.FC = () => {
   
   const [loadingAI, setLoadingAI] = useState(false);
   const [recommendation, setRecommendation] = useState<PriceRecommendation | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && skillInput.trim()) {
@@ -34,13 +35,22 @@ const TaskCreate: React.FC = () => {
     if (!formData.title || !formData.description) return;
     
     setLoadingAI(true);
-    const rec = await getPriceRecommendation(
+    setRecommendation(null);
+    setAiError(null);
+
+    const result: RecommendationResult = await getPriceRecommendation(
       formData.title,
       formData.description,
       formData.category,
       skills
     );
-    setRecommendation(rec);
+
+    if (result.recommendation) {
+      setRecommendation(result.recommendation);
+    } else {
+      setAiError(result.error);
+    }
+
     setLoadingAI(false);
   };
 
@@ -49,6 +59,24 @@ const TaskCreate: React.FC = () => {
       setFormData({ ...formData, budget: recommendation.recommendedPrice.toString() });
     }
   };
+  
+  const ErrorState: React.FC<{ message: string }> = ({ message }) => (
+    <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg animate-fade-in">
+        <div className="flex items-center">
+            <XCircle size={20} className="mr-3"/>
+            <div className='text-left'>
+                <p className="font-bold text-sm">Error</p>
+                <p className="text-xs">{message}</p>
+            </div>
+        </div>
+        <button 
+            onClick={fetchPriceRecommendation}
+            className="text-red-600 text-xs font-medium hover:underline mt-3 text-left"
+        >
+            Try Again
+        </button>
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -193,6 +221,8 @@ const TaskCreate: React.FC = () => {
                     <Loader2 className="animate-spin text-indigo-600 mb-2" size={24} />
                     <p className="text-sm text-indigo-600 font-medium">Analyzing market rates...</p>
                 </div>
+            ) : aiError ? (
+                <ErrorState message={aiError} />
             ) : recommendation ? (
                 <div className="space-y-5 animate-fade-in">
                     <div className="text-center">

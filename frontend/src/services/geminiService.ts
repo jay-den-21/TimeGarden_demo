@@ -9,20 +9,26 @@ export interface PriceRecommendation {
   acceptanceRate: string; // e.g., "High", "Medium", "Low"
 }
 
+export interface RecommendationResult {
+  recommendation: PriceRecommendation | null;
+  error: string | null;
+}
+
 export const getPriceRecommendation = async (
   title: string,
   description: string,
   category: string,
   skills: string[]
-): Promise<PriceRecommendation | null> => {
-  if (!process.env.API_KEY) {
-    console.warn("No API KEY found");
-    return null;
+): Promise<RecommendationResult> => {
+  if (!process.env.API_KEY || process.env.API_KEY === "your_gemini_api_key") {
+    const errorMsg = "API Key is not configured. Please add it to your frontend/.env file.";
+    console.warn(errorMsg);
+    return { recommendation: null, error: errorMsg };
   }
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       You are an expert pricing algorithm for a university task marketplace called TimeGarden.
@@ -52,10 +58,18 @@ export const getPriceRecommendation = async (
     // Clean up potential markdown code blocks
     text = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    return JSON.parse(text) as PriceRecommendation;
+    if (!text.startsWith("{")) {
+        throw new Error("Invalid response format from API. Expected a JSON object.");
+    }
+    
+    const recommendation = JSON.parse(text) as PriceRecommendation;
+    return { recommendation, error: null };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching price recommendation:", error);
-    return null;
+    const errorMessage = error.message.includes("API key not valid")
+      ? "Your API Key is not valid. Please check your .env file or Google AI Studio."
+      : `An error occurred: ${error.message}`;
+    return { recommendation: null, error: errorMessage };
   }
 };
