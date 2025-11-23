@@ -119,8 +119,79 @@ const createProposal = async (req, res) => {
   }
 };
 
+
+ // Update proposal status (Accept/Reject)
+ // If accepted, a contract is automatically created.
+
+const updateProposalStatus = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const proposalId = req.params.id;
+    const { status } = req.body; // 'accepted' or 'rejected'
+    
+    // 1. Update the proposal status
+    await connection.query(
+      'UPDATE proposals SET status = ? WHERE id = ?',
+      [status, proposalId]
+    );
+
+    // 2. If accepted, create a new contract automatically
+    if (status === 'accepted') {
+      // Fetch proposal details to get applicant_id (Provider)
+      const [proposals] = await connection.query(
+        'SELECT * FROM proposals WHERE id = ?', 
+        [proposalId]
+      );
+      
+      if (proposals.length === 0) {
+        throw new Error('Proposal not found');
+      }
+      const proposal = proposals[0];
+
+      // Fetch task details to get poster_id (Requester) and deadline
+      const [tasks] = await connection.query(
+        'SELECT poster_id, deadline FROM tasks WHERE id = ?',
+        [proposal.task_id]
+      );
+      const task = tasks[0];
+
+      // Insert new contract into database
+      await connection.query(`
+        INSERT INTO contracts 
+        (proposal_id, requester_id, provider_id, amount, status, start_date, end_date)
+        VALUES (?, ?, ?, ?, 'active', NOW(), ?)
+      `, [
+        proposalId, 
+        task.poster_id, // Requester (The one who posted the task)
+        proposal.applicant_id, // Provider (The one who applied)
+        proposal.amount,
+        task.deadline || null
+      ]);
+      
+      // Update task status to 'in_progress'
+      await connection.query(
+        'UPDATE tasks SET status = "in_progress" WHERE id = ?',
+        [proposal.task_id]
+      );
+    }
+
+    await connection.commit();
+    res.json({ success: true, status });
+
+  } catch (err) {
+    await connection.rollback();
+    console.error(err);
+    res.status(500).json({ error: 'Database error or Proposal not found' });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   getMyProposals,
   getProposalsForTask,
-  createProposal
+  createProposal,
+  updateProposalStatus
 };

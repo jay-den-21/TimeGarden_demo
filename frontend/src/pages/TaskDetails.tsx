@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2, X } from 'lucide-react';
-import { getTaskById, getCurrentUser, getProposalsForTask, createProposal } from '../services/mockDatabase';
+// Ensure updateProposalStatus is imported
+import { getTaskById, getCurrentUser, getProposalsForTask, createProposal, updateProposalStatus } from '../services/mockDatabase';
 import { TaskStatus, Task, Proposal, User } from '../types';
 
 const TaskDetails: React.FC = () => {
@@ -36,6 +37,34 @@ const TaskDetails: React.FC = () => {
       });
     }
   }, [id]);
+
+  // --- NEW FUNCTION ADDED HERE ---
+  // Function to handle Accept/Reject actions for proposals
+  const handleStatusUpdate = async (proposalId: number, status: 'accepted' | 'rejected') => {
+    // 1. Confirm action with user
+    if (!confirm(`Are you sure you want to ${status} this proposal?`)) return;
+    
+    try {
+      // 2. Call the backend API
+      await updateProposalStatus(proposalId, status);
+      
+      // 3. Refresh data to show updated status
+      if (task) {
+        // Refresh proposal list to show the green/red badge
+        getProposalsForTask(task.id).then(setProposals);
+        
+        // If accepted, the task status also changes to 'in_progress', so refresh task details
+        if (status === 'accepted') {
+           getTaskById(task.id).then(setTask);
+           alert("Proposal accepted! A new contract has been created.");
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update proposal status.");
+    }
+  };
+  // --- END OF NEW FUNCTION ---
 
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +131,10 @@ const TaskDetails: React.FC = () => {
                     <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold capitalize">{task.category}</span>
                     <span className="flex items-center"><Clock size={14} className="mr-1"/> Posted {task.createdAt || 'Recently'}</span>
                     <span className="flex items-center"><MapPin size={14} className="mr-1"/> Remote</span>
+                    {/* Display current task status */}
+                    <span className="flex items-center font-semibold capitalize text-blue-600">
+                        Status: {task.status.replace('_', ' ')}
+                    </span>
                 </div>
             </div>
             <div className="text-right">
@@ -128,7 +161,6 @@ const TaskDetails: React.FC = () => {
                     Proposals ({proposals.length})
                 </button>
             )}
-             {/* Only show messages tab if owner or if engaged (mock logic simplified to owner for now) */}
              {isOwner && (
                 <button 
                     onClick={() => setActiveTab('messages')}
@@ -191,12 +223,20 @@ const TaskDetails: React.FC = () => {
 
                                 <div className="flex justify-end space-x-3">
                                     <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">Message</button>
+                                    
+                                    {/* UPDATE: Added Logic for Accept/Reject Buttons */}
                                     {proposal.status === 'pending' ? (
                                         <>
-                                            <button className="flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100">
+                                            <button 
+                                                onClick={() => handleStatusUpdate(proposal.id, 'rejected')}
+                                                className="flex items-center px-4 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100"
+                                            >
                                                 <XCircle size={16} className="mr-1"/> Reject
                                             </button>
-                                            <button className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shadow-sm">
+                                            <button 
+                                                onClick={() => handleStatusUpdate(proposal.id, 'accepted')}
+                                                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 shadow-sm"
+                                            >
                                                 <CheckCircle size={16} className="mr-1"/> Accept
                                             </button>
                                         </>

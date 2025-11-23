@@ -144,3 +144,13 @@ export const createProposal = async (proposalData: {
     body: JSON.stringify(proposalData),
   });
 };
+
+/**
+ * Update the status of a proposal (accept/reject)
+ */
+export const updateProposalStatus = async (id: number, status: 'accepted' | 'rejected'): Promise<any> => {
+  return fetchAPI(`/proposals/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+};
