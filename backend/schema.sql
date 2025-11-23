@@ -141,17 +141,17 @@ CREATE TABLE reviews (
 -- SEED DATA (Inserts mock data into tables)
 -- =============================================
 
-INSERT INTO users (id, name, email, display_name) VALUES
-(1, 'Alice Johnson', 'alice@gmail.com', 'AliceJ'),
-(2, 'Bob Smith', 'bob@gmail.com', 'Bobby'),
-(3, 'Carol White', 'carol@gmail.com', 'CarolW'),
-(4, 'David Brown', 'david@gmail.com', 'Dave'),
-(5, 'Eva Green', 'eva@gmail.com', 'Evie'),
-(6, 'Frank Harris', 'frank@gmail.com', 'FrankH'),
-(7, 'Grace Lee', 'grace@gmail.com', 'Gracie'),
-(8, 'Henry Clark', 'henry@gmail.com', 'HenryC'),
-(9, 'Ivy Adams', 'ivy@gmail.com', 'IvyA'),
-(10, 'Jack Turner', 'jack@gmail.com', 'JackT');
+INSERT INTO users (id, name, email, display_name, password_hash) VALUES
+(1, 'Alice Johnson', 'alice@gmail.com', 'AliceJ', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(2, 'Bob Smith', 'bob@gmail.com', 'Bobby', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(3, 'Carol White', 'carol@gmail.com', 'CarolW', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(4, 'David Brown', 'david@gmail.com', 'Dave', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(5, 'Eva Green', 'eva@gmail.com', 'Evie', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(6, 'Frank Harris', 'frank@gmail.com', 'FrankH', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(7, 'Grace Lee', 'grace@gmail.com', 'Gracie', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(8, 'Henry Clark', 'henry@gmail.com', 'HenryC', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(9, 'Ivy Adams', 'ivy@gmail.com', 'IvyA', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0'),
+(10, 'Jack Turner', 'jack@gmail.com', 'JackT', '$2b$10$K7.O/8px.1/2.3/4.5.6.7.8.9.0.1.2.3.4.5.6.7.8.9.0');
 
 INSERT INTO wallets (user_id, balance, escrow_balance) VALUES
 (1, 240.00, 108.00),
