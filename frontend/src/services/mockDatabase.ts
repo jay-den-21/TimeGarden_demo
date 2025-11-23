@@ -84,6 +84,26 @@ export const getThreadMessages = async (threadId: number): Promise<ChatMessage[]
   return fetchAPI<ChatMessage[]>(`/threads/${threadId}/messages`);
 };
 
+/**
+ * Send a message to a thread
+ */
+export const sendMessage = async (threadId: number, text: string): Promise<ChatMessage> => {
+  const user = getUser();
+  if (!user || !user.id) {
+    throw new Error('User not logged in');
+  }
+
+  const message = await fetchAPI<ChatMessage>(`/threads/${threadId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  });
+  
+  // Set isMe flag
+  message.isMe = message.senderId === user.id;
+  
+  return message;
+};
+
 export const getReviewsForUser = async (userId: number): Promise<Review[]> => {
   return fetchAPI<Review[]>(`/reviews/user/${userId}`);
 };

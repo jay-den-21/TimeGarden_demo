@@ -141,17 +141,19 @@ CREATE TABLE reviews (
 -- SEED DATA (Inserts mock data into tables)
 -- =============================================
 
-INSERT INTO users (id, name, email, display_name) VALUES
-(1, 'Alice Johnson', 'alice@gmail.com', 'AliceJ'),
-(2, 'Bob Smith', 'bob@gmail.com', 'Bobby'),
-(3, 'Carol White', 'carol@gmail.com', 'CarolW'),
-(4, 'David Brown', 'david@gmail.com', 'Dave'),
-(5, 'Eva Green', 'eva@gmail.com', 'Evie'),
-(6, 'Frank Harris', 'frank@gmail.com', 'FrankH'),
-(7, 'Grace Lee', 'grace@gmail.com', 'Gracie'),
-(8, 'Henry Clark', 'henry@gmail.com', 'HenryC'),
-(9, 'Ivy Adams', 'ivy@gmail.com', 'IvyA'),
-(10, 'Jack Turner', 'jack@gmail.com', 'JackT');
+-- Note: password_hash is set to email itself (password = email) for seed data
+-- In production, users should set their own passwords via registration
+INSERT INTO users (id, name, email, display_name, password_hash) VALUES
+(1, 'Alice Johnson', 'alice@gmail.com', 'AliceJ', '$2b$10$IUuxuuwyvqk7xUhnWsKDAuGQlBgvPfznp3RmrfUauzDnEHRGZB0LS'),
+(2, 'Bob Smith', 'bob@gmail.com', 'Bobby', '$2b$10$X/x6ksue6gx91QPyfehgkuWGqtXmG9n0Do0ZFteRJo/XKp22WhXHi'),
+(3, 'Carol White', 'carol@gmail.com', 'CarolW', '$2b$10$RsC4QWxY5HjlbZLqqVCZr.q.dZ19ZFcrjkJ05lf7GSRuNdJ0x4Q.O'),
+(4, 'David Brown', 'david@gmail.com', 'Dave', '$2b$10$KU1stcLiPtEoVJLiuURDV.VYjtgKUFfwE6fP0a6zdnQaT1qXyAjoG'),
+(5, 'Eva Green', 'eva@gmail.com', 'Evie', '$2b$10$5ABzDMcK5AviaggZfZ/Zvuj2UlEavqUlJhPe797KXOmvgYYIzvG1K'),
+(6, 'Frank Harris', 'frank@gmail.com', 'FrankH', '$2b$10$zWNW.A4bxbRvCXyZpXhzwe5pUb/VloO5pcVhnH9ainvzgAQvwv7u6'),
+(7, 'Grace Lee', 'grace@gmail.com', 'Gracie', '$2b$10$TwfMU9Ft3ZKZCUH94j2SmONnfWomE4JVqtOomh6kHExZp4dFVwmfi'),
+(8, 'Henry Clark', 'henry@gmail.com', 'HenryC', '$2b$10$aFtiOOTurYYPAi28HxCnjOGAJFT36cGs4Is33TN8AkH1AUPfp/k7.'),
+(9, 'Ivy Adams', 'ivy@gmail.com', 'IvyA', '$2b$10$BgU4Uaa.NuvgA6.ENk53LeqZNHhEyas9oCsnS5KJR6/iYlxXNi2Ce'),
+(10, 'Jack Turner', 'jack@gmail.com', 'JackT', '$2b$10$jt85W9.BKCxbkCgsXs7C5eJVvOaWU4gTNxQovsXpvfk/HgVEhsAB.');
 
 INSERT INTO wallets (user_id, balance, escrow_balance) VALUES
 (1, 240.00, 108.00),

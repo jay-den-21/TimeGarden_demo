@@ -71,8 +71,93 @@ const getThreadMessages = async (req, res) => {
   }
 };
 
+/**
+ * Send a message to a thread
+ */
+const sendMessage = async (req, res) => {
+  try {
+    const threadId = parseInt(req.params.id) || parseInt(req.body.threadId);
+    const { text } = req.body;
+    const userId = req.userId;
+
+    if (!threadId || isNaN(threadId) || !text) {
+      return res.status(400).json({ error: 'Thread ID and message text are required' });
+    }
+
+    // Verify user is a participant in the thread
+    const [participants] = await pool.query(
+      'SELECT user_id FROM thread_participants WHERE thread_id = ? AND user_id = ?',
+      [threadId, userId]
+    );
+
+    if (participants.length === 0) {
+      return res.status(403).json({ error: 'You are not a participant in this thread' });
+    }
+
+    // Insert message into database
+    const [result] = await pool.query(
+      'INSERT INTO messages (thread_id, user_id, body) VALUES (?, ?, ?)',
+      [threadId, userId, text]
+    );
+
+    const messageId = result.insertId;
+
+    // Update thread's last_message_at
+    await pool.query(
+      'UPDATE threads SET last_message_at = NOW() WHERE id = ?',
+      [threadId]
+    );
+
+    // Get message with user info
+    // Note: Using 'body' as per schema.sql, mapping to 'text' for frontend compatibility
+    const [messages] = await pool.query(`
+      SELECT m.id, m.thread_id as threadId, m.user_id as senderId, m.body as text, 
+             date_format(m.created_at, "%H:%i") as timestamp,
+             u.display_name as senderName, m.attachments
+      FROM messages m
+      JOIN users u ON m.user_id = u.id
+      WHERE m.id = ?
+    `, [messageId]);
+
+    const message = {
+      ...messages[0],
+      isMe: messages[0].senderId === userId
+    };
+
+    // Emit via Socket.io if available
+    const io = req.app.get('io');
+    if (io) {
+      // Get all participants
+      const [allParticipants] = await pool.query(
+        'SELECT user_id FROM thread_participants WHERE thread_id = ?',
+        [threadId]
+      );
+
+      // Emit to each participant with correct isMe flag
+      allParticipants.forEach(participant => {
+        const participantId = participant.user_id;
+        const isMe = participantId === userId;
+        
+        io.to(`user:${participantId}`).emit('new_message', {
+          ...message,
+          isMe: isMe
+        });
+      });
+
+      // Also emit to thread room for anyone listening
+      io.to(`thread:${threadId}`).emit('new_message', message);
+    }
+
+    res.status(201).json(message);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getThreads,
-  getThreadMessages
+  getThreadMessages,
+  sendMessage
 };
 
