@@ -10,6 +10,8 @@ const Messages: React.FC = () => {
   const [activeThreadId, setActiveThreadId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [messageSearchTerm, setMessageSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -151,12 +153,24 @@ const Messages: React.FC = () => {
               type="text" 
               placeholder="Search conversations..." 
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          {threads.map((thread, index) => (
+          {threads
+            .filter(thread => {
+              if (!searchTerm.trim()) return true;
+              const search = searchTerm.toLowerCase();
+              return (
+                thread.partnerName.toLowerCase().includes(search) ||
+                thread.taskTitle.toLowerCase().includes(search) ||
+                thread.lastMessage.toLowerCase().includes(search)
+              );
+            })
+            .map((thread, index) => (
             <div 
               key={thread.id}
               onClick={() => setActiveThreadId(thread.id)}
@@ -179,9 +193,19 @@ const Messages: React.FC = () => {
                 </div>
               )}
             </div>
-          ))}
-          {threads.length === 0 && (
-            <div className="p-4 text-center text-gray-400 text-sm">No messages yet</div>
+            ))}
+          {threads.filter(thread => {
+            if (!searchTerm.trim()) return true;
+            const search = searchTerm.toLowerCase();
+            return (
+              thread.partnerName.toLowerCase().includes(search) ||
+              thread.taskTitle.toLowerCase().includes(search) ||
+              thread.lastMessage.toLowerCase().includes(search)
+            );
+          }).length === 0 && (
+            <div className="p-4 text-center text-gray-400 text-sm">
+              {searchTerm.trim() ? 'No conversations found' : 'No messages yet'}
+            </div>
           )}
         </div>
       </div>
@@ -201,6 +225,16 @@ const Messages: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4 text-gray-500">
+              <div className="relative">
+                <Search className="absolute left-2 top-2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search messages..."
+                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+                  value={messageSearchTerm}
+                  onChange={(e) => setMessageSearchTerm(e.target.value)}
+                />
+              </div>
               <Phone size={20} className="hover:text-gray-800 cursor-pointer" />
               <Video size={20} className="hover:text-gray-800 cursor-pointer" />
               <MoreVertical size={20} className="hover:text-gray-800 cursor-pointer" />
@@ -217,7 +251,14 @@ const Messages: React.FC = () => {
                 No messages yet. Start the conversation!
               </div>
             ) : (
-              messages.map(msg => (
+              messages
+                .filter(msg => {
+                  if (!messageSearchTerm.trim()) return true;
+                  const search = messageSearchTerm.toLowerCase();
+                  return msg.text.toLowerCase().includes(search) || 
+                         msg.senderName.toLowerCase().includes(search);
+                })
+                .map(msg => (
                 <div key={msg.id} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${
                     msg.isMe
@@ -227,7 +268,19 @@ const Messages: React.FC = () => {
                     {!msg.isMe && (
                       <p className="text-xs font-semibold mb-1 text-gray-700">{msg.senderName}</p>
                     )}
-                    <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {messageSearchTerm.trim() ? (
+                        msg.text.split(new RegExp(`(${messageSearchTerm})`, 'gi')).map((part, i) => 
+                          part.toLowerCase() === messageSearchTerm.toLowerCase() ? (
+                            <mark key={i} className="bg-yellow-200 text-gray-900">{part}</mark>
+                          ) : (
+                            <span key={i}>{part}</span>
+                          )
+                        )
+                      ) : (
+                        msg.text
+                      )}
+                    </p>
                     <p className={`text-[10px] mt-1 text-right ${msg.isMe ? 'text-blue-100' : 'text-gray-400'}`}>
                       {msg.timestamp}
                     </p>

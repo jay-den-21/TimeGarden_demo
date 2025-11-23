@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Clock, Users, AlertTriangle, Loader2 } from 'lucide-react';
+import { Search, Filter, Clock, Users, AlertTriangle, Loader2, ArrowUpDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getAllTasks } from '../services/mockDatabase';
 import { Task } from '../types';
@@ -8,19 +8,37 @@ const BrowseTasks: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hideLowPrice, setHideLowPrice] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAllTasks().then(tasks => {
+    setLoading(true);
+    getAllTasks(sortBy, sortOrder).then(tasks => {
       setAllTasks(tasks);
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);
     });
-  }, []);
+  }, [sortBy, sortOrder]);
 
   const filteredTasks = allTasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          task.skills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!searchTerm.trim()) {
+      // If no search term, only apply filters
+      const matchesCategory = categoryFilter === 'All' || task.category === categoryFilter;
+      const isNotLowPrice = hideLowPrice ? task.budget >= 25 : true;
+      return matchesCategory && isNotLowPrice;
+    }
+    
+    const search = searchTerm.toLowerCase();
+    const matchesSearch = 
+      task.title.toLowerCase().includes(search) || 
+      (task.description && task.description.toLowerCase().includes(search)) ||
+      task.skills.some(s => s.toLowerCase().includes(search)) ||
+      (task.publisherName && task.publisherName.toLowerCase().includes(search)) ||
+      (task.category && task.category.toLowerCase().includes(search));
+    
     const matchesCategory = categoryFilter === 'All' || task.category === categoryFilter;
     const isNotLowPrice = hideLowPrice ? task.budget >= 25 : true;
 
@@ -40,7 +58,7 @@ const BrowseTasks: React.FC = () => {
           <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           <input 
             type="text" 
-            placeholder="Search tasks, skills, or keywords..." 
+            placeholder="Search tasks, skills, description, publisher, or keywords..." 
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -48,7 +66,7 @@ const BrowseTasks: React.FC = () => {
         </div>
 
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex items-center space-x-4 w-full md:w-auto">
+          <div className="flex items-center space-x-4 w-full md:w-auto flex-wrap">
             <select 
               className="px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm focus:outline-none w-full md:w-48"
               value={categoryFilter}
@@ -75,9 +93,29 @@ const BrowseTasks: React.FC = () => {
             </label>
           </div>
           
-          <button className="flex items-center text-gray-500 hover:text-gray-800 text-sm font-medium">
-             <Filter size={16} className="mr-1"/> More Filters
-          </button>
+          <div className="flex items-center space-x-2 w-full md:w-auto">
+            <div className="flex items-center space-x-2">
+              <ArrowUpDown size={16} className="text-gray-400" />
+              <select 
+                className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="created_at">Posted Date</option>
+                <option value="deadline">Deadline</option>
+                <option value="budget">Budget</option>
+                <option value="proposals">Proposals</option>
+                <option value="title">Title</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

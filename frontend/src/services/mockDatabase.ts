@@ -62,12 +62,20 @@ export const getMyTransactions = async (): Promise<Transaction[]> => {
   return fetchAPI<Transaction[]>('/transactions');
 };
 
-export const getMyTasks = async (): Promise<Task[]> => {
-  return fetchAPI<Task[]>('/tasks/my');
+export const getMyTasks = async (sortBy?: string, order?: string): Promise<Task[]> => {
+  const params = new URLSearchParams();
+  if (sortBy) params.append('sortBy', sortBy);
+  if (order) params.append('order', order);
+  const queryString = params.toString();
+  return fetchAPI<Task[]>(`/tasks/my${queryString ? `?${queryString}` : ''}`);
 };
 
-export const getAllTasks = async (): Promise<Task[]> => {
-  return fetchAPI<Task[]>('/tasks');
+export const getAllTasks = async (sortBy?: string, order?: string): Promise<Task[]> => {
+  const params = new URLSearchParams();
+  if (sortBy) params.append('sortBy', sortBy);
+  if (order) params.append('order', order);
+  const queryString = params.toString();
+  return fetchAPI<Task[]>(`/tasks${queryString ? `?${queryString}` : ''}`);
 };
 
 export const getTaskById = async (id: number): Promise<Task | null> => {

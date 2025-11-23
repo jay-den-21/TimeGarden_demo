@@ -6,10 +6,35 @@ const { normalizeStatus } = require('../utils/statusNormalizer');
 /**
  * Get all OPEN tasks (For Browse Page)
  * Only shows tasks that haven't been started yet.
+ * Supports sorting via query parameters: ?sortBy=created_at&order=desc
  */
 const getAllTasks = async (req, res) => {
   try {
-    // [Fix 1] Added WHERE t.status = 'open' to hide in-progress/completed tasks
+    // Get sort parameters from query string
+    const sortBy = req.query.sortBy || 'created_at';
+    const order = (req.query.order || 'desc').toUpperCase();
+    
+    // Validate sortBy to prevent SQL injection
+    const allowedSortFields = {
+      'created_at': 't.created_at',
+      'deadline': 't.deadline',
+      'budget': 't.budget',
+      'proposals': 'proposalsCount',
+      'title': 't.title'
+    };
+    
+    const sortField = allowedSortFields[sortBy] || allowedSortFields['created_at'];
+    const sortOrder = (order === 'ASC' || order === 'DESC') ? order : 'DESC';
+    
+    // Build query with dynamic sorting
+    // For proposalsCount, we need to use the subquery in ORDER BY
+    let orderByClause;
+    if (sortBy === 'proposals') {
+      orderByClause = `ORDER BY (SELECT COUNT(*) FROM proposals p WHERE p.task_id = t.id) ${sortOrder}`;
+    } else {
+      orderByClause = `ORDER BY ${sortField} ${sortOrder}`;
+    }
+    
     const query = `
       SELECT t.id, t.title, t.description, t.budget, date_format(t.deadline, "%Y-%m-%d") as deadline, 
              t.status, t.category, date_format(t.created_at, "%Y-%m-%d") as createdAt, 
@@ -18,7 +43,7 @@ const getAllTasks = async (req, res) => {
       FROM tasks t
       JOIN users u ON t.poster_id = u.id
       WHERE t.status = 'open' 
-      ORDER BY t.created_at DESC
+      ${orderByClause}
     `;
     const [tasks] = await pool.query(query);
     
@@ -42,10 +67,38 @@ const getAllTasks = async (req, res) => {
 /**
  * Get tasks posted by current user (Dashboard)
  * Shows ALL statuses (open, in_progress, completed, etc.)
+ * Supports sorting via query parameters: ?sortBy=created_at&order=desc
  */
 const getMyTasks = async (req, res) => {
   try {
     const userId = req.userId;
+    
+    // Get sort parameters from query string
+    const sortBy = req.query.sortBy || 'created_at';
+    const order = (req.query.order || 'desc').toUpperCase();
+    
+    // Validate sortBy to prevent SQL injection
+    const allowedSortFields = {
+      'created_at': 't.created_at',
+      'deadline': 't.deadline',
+      'budget': 't.budget',
+      'proposals': 'proposalsCount',
+      'title': 't.title',
+      'status': 't.status'
+    };
+    
+    const sortField = allowedSortFields[sortBy] || allowedSortFields['created_at'];
+    const sortOrder = (order === 'ASC' || order === 'DESC') ? order : 'DESC';
+    
+    // Build query with dynamic sorting
+    // For proposalsCount, we need to use the subquery in ORDER BY
+    let orderByClause;
+    if (sortBy === 'proposals') {
+      orderByClause = `ORDER BY (SELECT COUNT(*) FROM proposals p WHERE p.task_id = t.id) ${sortOrder}`;
+    } else {
+      orderByClause = `ORDER BY ${sortField} ${sortOrder}`;
+    }
+    
     const query = `
       SELECT t.id, t.title, t.description, t.budget, date_format(t.deadline, "%Y-%m-%d") as deadline, 
              t.status, t.category, date_format(t.created_at, "%Y-%m-%d") as createdAt, 
@@ -54,7 +107,7 @@ const getMyTasks = async (req, res) => {
       FROM tasks t
       JOIN users u ON t.poster_id = u.id
       WHERE t.poster_id = ?
-      ORDER BY t.created_at DESC
+      ${orderByClause}
     `;
     const [tasks] = await pool.query(query, [userId]);
     
