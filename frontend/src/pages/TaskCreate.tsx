@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { getPriceRecommendation, PriceRecommendation, RecommendationResult } from '../services/geminiService';
 import { Loader2, Sparkles, Info, AlertTriangle, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { createTask } from '../services/mockDatabase';
 
 const TaskCreate: React.FC = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -16,6 +19,8 @@ const TaskCreate: React.FC = () => {
   const [loadingAI, setLoadingAI] = useState(false);
   const [recommendation, setRecommendation] = useState<PriceRecommendation | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAddSkill = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && skillInput.trim()) {
@@ -59,6 +64,42 @@ const TaskCreate: React.FC = () => {
       setFormData({ ...formData, budget: recommendation.recommendedPrice.toString() });
     }
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    // Validation
+    if (!formData.title || !formData.description || !formData.budget) {
+      setError('Please fill in all required fields (Title, Description, and Budget)');
+      return;
+    }
+
+    if (Number(formData.budget) <= 0) {
+      setError('Budget must be greater than 0');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      await createTask({
+        title: formData.title,
+        description: formData.description,
+        budget: Number(formData.budget),
+        deadline: formData.deadline || undefined,
+        category: formData.category,
+        skills: skills,
+      });
+      
+      // Success - redirect to browse tasks
+      navigate('/browse');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create task. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
   
   const ErrorState: React.FC<{ message: string }> = ({ message }) => (
     <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg animate-fade-in">
@@ -88,8 +129,15 @@ const TaskCreate: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Form */}
         <div className="lg:col-span-2 bg-white p-6 md:p-8 rounded-xl border border-gray-200 shadow-sm">
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-6" onSubmit={handleSubmit}>
             
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
             {/* Basic Info */}
             <div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
@@ -106,6 +154,7 @@ const TaskCreate: React.FC = () => {
                         value={formData.title}
                         onChange={e => setFormData({...formData, title: e.target.value})}
                         onBlur={fetchPriceRecommendation}
+                        required
                     />
                     </div>
                     <div>
@@ -116,6 +165,7 @@ const TaskCreate: React.FC = () => {
                         value={formData.description}
                         onChange={e => setFormData({...formData, description: e.target.value})}
                         onBlur={fetchPriceRecommendation}
+                        required
                     />
                     </div>
                     <div>
@@ -154,7 +204,13 @@ const TaskCreate: React.FC = () => {
                         {skills.map(skill => (
                         <span key={skill} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm flex items-center">
                             {skill}
-                            <button onClick={() => removeSkill(skill)} className="ml-2 text-gray-400 hover:text-red-500">×</button>
+                            <button 
+                                type="button"
+                                onClick={() => removeSkill(skill)} 
+                                className="ml-2 text-gray-400 hover:text-red-500"
+                            >
+                                ×
+                            </button>
                         </span>
                         ))}
                     </div>
@@ -176,6 +232,9 @@ const TaskCreate: React.FC = () => {
                             placeholder="Enter amount"
                             value={formData.budget}
                             onChange={e => setFormData({...formData, budget: e.target.value})}
+                            min="0"
+                            step="0.01"
+                            required
                         />
                         {recommendation && Number(formData.budget) < recommendation.minPrice && formData.budget !== '' && (
                             <p className="text-xs text-amber-600 mt-1 flex items-center">
@@ -196,8 +255,27 @@ const TaskCreate: React.FC = () => {
              </div>
 
              <div className="pt-6 flex justify-end space-x-4">
-                 <button className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">Save Draft</button>
-                 <button className="px-6 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700 font-medium shadow-sm">Publish Task</button>
+                 <button 
+                    type="button"
+                    className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                    onClick={() => navigate('/browse')}
+                 >
+                    Cancel
+                 </button>
+                 <button 
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2 bg-blue-600 rounded-lg text-white hover:bg-blue-700 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                 >
+                    {submitting ? (
+                        <>
+                            <Loader2 className="animate-spin mr-2" size={18} />
+                            Publishing...
+                        </>
+                    ) : (
+                        'Publish Task'
+                    )}
+                 </button>
              </div>
 
           </form>

@@ -107,3 +107,17 @@ export const sendMessage = async (threadId: number, text: string): Promise<ChatM
 export const getReviewsForUser = async (userId: number): Promise<Review[]> => {
   return fetchAPI<Review[]>(`/reviews/user/${userId}`);
 };
+
+export const createTask = async (taskData: {
+  title: string;
+  description: string;
+  budget: number;
+  deadline?: string;
+  category: string;
+  skills: string[];
+}): Promise<Task> => {
+  return fetchAPI<Task>('/tasks', {
+    method: 'POST',
+    body: JSON.stringify(taskData),
+  });
+};
