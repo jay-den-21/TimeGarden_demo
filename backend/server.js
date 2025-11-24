@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 require('dotenv').config();
+const { applyDbSecurity } = require('./utils/applyDbSecurity');
 
 const apiRoutes = require('./routes');
 const socketHandler = require('./socket/socketHandler');
@@ -38,9 +39,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// Start server
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Socket.io server initialized`);
-});
+// Start server (optionally applying DB security script)
+const start = async () => {
+  try {
+    if (process.env.APPLY_DB_SECURITY === 'true') {
+      await applyDbSecurity();
+    }
+  } catch (err) {
+    console.error('DB security bootstrap failed. Server will still start.', err.message);
+  }
+
+  const PORT = process.env.PORT || 4000;
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Socket.io server initialized`);
+  });
+};
+
+start();

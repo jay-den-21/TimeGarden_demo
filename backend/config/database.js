@@ -10,7 +10,8 @@ const {
   DB_PASS,
   DB_PASSWORD,
   DB_NAME = 'TimeGarden',
-  DB_PORT = 3306
+  DB_PORT = 3306,
+  DB_REQUIRE_NON_ROOT = 'false'
 } = process.env;
 
 const poolConfig = {
@@ -38,6 +39,15 @@ if (password) {
 
 const pool = mysql.createPool(poolConfig);
 
+// Warn or block if using root when least-privilege is required
+if ((DB_USER || '').toLowerCase() === 'root') {
+  if (DB_REQUIRE_NON_ROOT === 'true') {
+    throw new Error('Database user is root but DB_REQUIRE_NON_ROOT=true. Configure a least-privilege DB user in backend/.env');
+  } else {
+    console.warn('⚠️  Using MySQL root account. For production, set DB_USER to a least-privilege account and DB_REQUIRE_NON_ROOT=true to prevent root usage.');
+  }
+}
+
 // Test the connection immediately on startup to provide helpful feedback
 pool.getConnection()
   .then(connection => {
@@ -54,4 +64,3 @@ pool.getConnection()
   });
 
 module.exports = pool;
-

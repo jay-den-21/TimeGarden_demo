@@ -69,6 +69,17 @@ const getReceivedProposals = async (req, res) => {
 const getProposalsForTask = async (req, res) => {
   try {
     const taskId = req.params.taskId;
+    const userId = req.userId;
+
+    // Ensure caller owns the task (row-level auth)
+    const [tasks] = await pool.query('SELECT poster_id FROM tasks WHERE id = ?', [taskId]);
+    if (!tasks.length) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    if (tasks[0].poster_id !== userId) {
+      return res.status(403).json({ error: 'Not authorized to view proposals for this task' });
+    }
+
     const [rows] = await pool.query(`
       SELECT p.id, p.amount, p.message, p.status, date_format(p.created_at, "%Y-%m-%d") as createdAt,
              u.display_name as applicantName, p.applicant_id as applicantId
@@ -166,6 +177,31 @@ const updateProposalStatus = async (req, res) => {
 
     const proposalId = req.params.id;
     const { status } = req.body; 
+
+    if (!['accepted', 'rejected'].includes(status)) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Invalid proposal status' });
+    }
+
+    // Fetch proposal and owning task for row-level auth before any writes
+    const [proposals] = await connection.query('SELECT * FROM proposals WHERE id = ?', [proposalId]);
+    if (!proposals.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    const proposal = proposals[0];
+
+    const [tasks] = await connection.query('SELECT poster_id, deadline FROM tasks WHERE id = ?', [proposal.task_id]);
+    if (!tasks.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    const task = tasks[0];
+
+    if (task.poster_id !== req.userId) {
+      await connection.rollback();
+      return res.status(403).json({ error: 'Not authorized to update proposals for this task' });
+    }
     
     // 1. Update proposal status
     await connection.query(
@@ -174,16 +210,6 @@ const updateProposalStatus = async (req, res) => {
     );
 
     if (status === 'accepted') {
-      // Get proposal details
-      const [proposals] = await connection.query('SELECT * FROM proposals WHERE id = ?', [proposalId]);
-      if (proposals.length === 0) throw new Error('Proposal not found');
-      const proposal = proposals[0];
-
-      // Get task details
-      const [tasks] = await connection.query('SELECT poster_id, deadline FROM tasks WHERE id = ?', [proposal.task_id]);
-      const task = tasks[0];
-
-      
       // check money
       const [requesterWallet] = await connection.query('SELECT balance FROM wallets WHERE user_id = ?', [task.poster_id]);
       if (requesterWallet.length === 0 || requesterWallet[0].balance < proposal.amount) {

@@ -38,7 +38,9 @@ const TaskDetails: React.FC = () => {
       ]).then(([t, u]) => {
         setTask(t);
         setCurrentUser(u);
-        if (t) {
+
+        // Only fetch proposals if the current user owns the task (row-level auth)
+        if (t && u && t.posterId === u.id) {
           getProposalsForTask(t.id).then(setProposals);
         }
         setLoading(false);
