@@ -128,13 +128,6 @@ const Wallet: React.FC = () => {
                 <div className="font-semibold text-pink-900">Statements</div>
                 <div className="text-xs text-pink-700">Download reports</div>
            </button>
-            <button className="p-4 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-100 transition-colors text-left group">
-                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center text-amber-700 mb-2 group-hover:scale-110 transition-transform">
-                    <Lock size={16} />
-                </div>
-                <div className="font-semibold text-amber-900">Escrow</div>
-                <div className="text-xs text-amber-700">View locked funds</div>
-           </button>
       </div>
 
       {/* Analytics Chart & History */}
