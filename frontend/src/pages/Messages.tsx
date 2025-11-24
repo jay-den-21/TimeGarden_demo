@@ -291,21 +291,6 @@ const Messages: React.FC = () => {
                   onChange={(e) => setMessageSearchTerm(e.target.value)}
                 />
               </div>
-              <button
-                onClick={() => activeThreadId && handleDeleteThread(activeThreadId, {} as React.MouseEvent)}
-                disabled={!activeThreadId || deletingThreadId === activeThreadId}
-                className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Delete entire conversation"
-              >
-                {deletingThreadId === activeThreadId ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <>
-                    <Trash2 size={16} className="mr-1" />
-                    Delete Conversation
-                  </>
-                )}
-              </button>
               <Phone size={20} className="hover:text-gray-800 cursor-pointer" />
               <Video size={20} className="hover:text-gray-800 cursor-pointer" />
               <MoreVertical size={20} className="hover:text-gray-800 cursor-pointer" />

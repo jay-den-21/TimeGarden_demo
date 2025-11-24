@@ -72,9 +72,6 @@ const Wallet: React.FC = () => {
                 </button>
               </div>
             </div>
-            <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm">
-                <ArrowUpRight size={16} className="mr-2"/> Add Funds
-            </button>
         </div>
       </div>
 
@@ -120,21 +117,7 @@ const Wallet: React.FC = () => {
       </div>
     
       {/* Quick Actions Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-           <button className="p-4 bg-green-50 hover:bg-green-100 rounded-xl border border-green-100 transition-colors text-left group">
-                <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center text-green-700 mb-2 group-hover:scale-110 transition-transform">
-                    <ArrowUpRight size={16} />
-                </div>
-                <div className="font-semibold text-green-900">Deposit</div>
-                <div className="text-xs text-green-700">Add funds to wallet</div>
-           </button>
-           <button className="p-4 bg-purple-50 hover:bg-purple-100 rounded-xl border border-purple-100 transition-colors text-left group">
-                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center text-purple-700 mb-2 group-hover:scale-110 transition-transform">
-                    <ArrowDownLeft size={16} />
-                </div>
-                <div className="font-semibold text-purple-900">Withdraw</div>
-                <div className="text-xs text-purple-700">Transfer to bank</div>
-           </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            <button 
              onClick={() => handleExport('json')}
              className="p-4 bg-pink-50 hover:bg-pink-100 rounded-xl border border-pink-100 transition-colors text-left group"

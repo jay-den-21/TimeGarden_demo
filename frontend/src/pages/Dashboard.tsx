@@ -94,9 +94,6 @@ const Dashboard: React.FC = () => {
             <Link to="/wallet" className="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white px-6 py-2 rounded-lg font-medium text-center transition-colors">
               View Wallet
             </Link>
-            <Link to="/wallet" className="bg-white text-blue-700 hover:bg-blue-50 px-6 py-2 rounded-lg font-medium text-center transition-colors shadow-sm">
-              Add Funds
-            </Link>
           </div>
         </div>
       </div>
