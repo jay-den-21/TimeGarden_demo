@@ -109,16 +109,42 @@ export const getThreadMessages = async (threadId: number): Promise<ChatMessage[]
 /**
  * Send a message to a thread
  */
-export const sendMessage = async (threadId: number, text: string): Promise<ChatMessage> => {
+export const sendMessage = async (threadId: number, text: string, attachment?: File | null): Promise<ChatMessage> => {
   const user = getUser();
   if (!user || !user.id) {
     throw new Error('User not logged in');
   }
 
-  const message = await fetchAPI<ChatMessage>(`/threads/${threadId}/messages`, {
+  const formData = new FormData();
+  formData.append('text', text);
+  if (attachment) {
+    formData.append('attachment', attachment);
+  }
+
+  const res = await fetch(`${API_URL}/threads/${threadId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    headers: {
+      'X-User-Id': user.id.toString(),
+    },
+    body: formData,
   });
+
+  if (!res.ok) {
+    let errorMessage = `API Error: ${res.status} ${res.statusText}`;
+    try {
+      const errorData = await res.json();
+      if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+    } catch (e) {
+      // If response isn't JSON, use the status text
+    }
+    throw new Error(errorMessage);
+  }
+
+  const message = await res.json();
   
   // Set isMe flag
   message.isMe = message.senderId === user.id;

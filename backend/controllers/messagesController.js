@@ -84,9 +84,10 @@ const sendMessage = async (req, res) => {
     const threadId = parseInt(req.params.id) || parseInt(req.body.threadId);
     const { text } = req.body;
     const userId = req.userId;
+    const attachmentPath = req.file ? `/uploads/${req.file.filename}` : null;
 
-    if (!threadId || isNaN(threadId) || !text) {
-      return res.status(400).json({ error: 'Thread ID and message text are required' });
+    if (!threadId || isNaN(threadId) || (!text && !attachmentPath)) {
+      return res.status(400).json({ error: 'Thread ID and message text or an attachment are required' });
     }
 
     // Verify user is a participant in the thread
@@ -101,8 +102,8 @@ const sendMessage = async (req, res) => {
 
     // Insert message into database
     const [result] = await pool.query(
-      'INSERT INTO messages (thread_id, user_id, body) VALUES (?, ?, ?)',
-      [threadId, userId, text]
+      'INSERT INTO messages (thread_id, user_id, body, attachments) VALUES (?, ?, ?, ?)',
+      [threadId, userId, text, attachmentPath]
     );
 
     const messageId = result.insertId;

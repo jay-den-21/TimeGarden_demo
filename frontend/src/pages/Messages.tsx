@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Send, Paperclip, MoreVertical, Phone, Video, Loader2, Trash2 } from 'lucide-react';
+import { Search, Send, Paperclip, MoreVertical, Phone, Video, Loader2, Trash2, X, Download } from 'lucide-react';
 import { getMyThreads, getThreadMessages, sendMessage, deleteMessage, deleteThread } from '../services/mockDatabase';
 import { socketService } from '../services/socketService';
 import { ChatThread, ChatMessage } from '../types';
 import { getUser } from '../services/authService';
+
+const API_URL = 'http://localhost:4000';
 
 const Messages: React.FC = () => {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [messageSearchTerm, setMessageSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -18,6 +21,7 @@ const Messages: React.FC = () => {
   const [deletingThreadId, setDeletingThreadId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const currentUser = getUser();
 
   // Load threads on mount
@@ -80,7 +84,7 @@ const Messages: React.FC = () => {
         if (thread.id === newMessage.threadId) {
           return {
             ...thread,
-            lastMessage: newMessage.text,
+            lastMessage: newMessage.text || 'Attachment',
             lastMessageTime: new Date().toLocaleString()
           };
         }
@@ -105,20 +109,21 @@ const Messages: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !activeThreadId || sending) return;
+    if ((!inputValue.trim() && !attachment) || !activeThreadId || sending) return;
 
     const text = inputValue.trim();
+    const file = attachment;
+
     setInputValue('');
+    setAttachment(null);
     setSending(true);
 
     try {
       // Send via API (which also triggers socket to notify other users)
-      const sentMessage = await sendMessage(activeThreadId, text);
+      const sentMessage = await sendMessage(activeThreadId, text, file);
       
       // Optimistically add message for immediate feedback
-      // The socket event will update it with the real ID if needed
       setMessages(prev => {
-        // Check if message already exists (from socket)
         const exists = prev.some(m => m.id === sentMessage.id);
         if (exists) return prev;
         return [...prev, sentMessage];
@@ -127,8 +132,15 @@ const Messages: React.FC = () => {
       console.error('Failed to send message:', error);
       // Restore input value on error
       setInputValue(text);
+      setAttachment(file);
     } finally {
       setSending(false);
+    }
+  };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setAttachment(e.target.files[0]);
     }
   };
 
@@ -209,7 +221,7 @@ const Messages: React.FC = () => {
               return (
                 thread.partnerName.toLowerCase().includes(search) ||
                 thread.taskTitle.toLowerCase().includes(search) ||
-                thread.lastMessage.toLowerCase().includes(search)
+                (thread.lastMessage && thread.lastMessage.toLowerCase().includes(search))
               );
             })
             .map((thread, index) => (
@@ -227,7 +239,7 @@ const Messages: React.FC = () => {
                   <span className="text-xs text-gray-400">{thread.lastMessageTime}</span>
                 </div>
                 <p className="text-xs text-gray-500 truncate mb-1">{thread.taskTitle}</p>
-                <p className="text-sm text-gray-600 truncate">{thread.lastMessage}</p>
+                <p className="text-sm text-gray-600 truncate">{thread.lastMessage || 'Attachment'}</p>
               </div>
               <div className="flex items-center space-x-2">
                 {thread.unreadCount > 0 && (
@@ -256,7 +268,7 @@ const Messages: React.FC = () => {
             return (
               thread.partnerName.toLowerCase().includes(search) ||
               thread.taskTitle.toLowerCase().includes(search) ||
-              thread.lastMessage.toLowerCase().includes(search)
+              (thread.lastMessage && thread.lastMessage.toLowerCase().includes(search))
             );
           }).length === 0 && (
             <div className="p-4 text-center text-gray-400 text-sm">
@@ -311,7 +323,7 @@ const Messages: React.FC = () => {
                 .filter(msg => {
                   if (!messageSearchTerm.trim()) return true;
                   const search = messageSearchTerm.toLowerCase();
-                  return msg.text.toLowerCase().includes(search) || 
+                  return (msg.text && msg.text.toLowerCase().includes(search)) || 
                          msg.senderName.toLowerCase().includes(search);
                 })
                 .map(msg => (
@@ -338,7 +350,7 @@ const Messages: React.FC = () => {
                     {!msg.isMe && (
                       <p className="text-xs font-semibold mb-1 text-gray-700">{msg.senderName}</p>
                     )}
-                    <p className="text-sm whitespace-pre-wrap break-words">
+                    {msg.text && <p className="text-sm whitespace-pre-wrap break-words">
                       {messageSearchTerm.trim() ? (
                         msg.text.split(new RegExp(`(${messageSearchTerm})`, 'gi')).map((part, i) => 
                           part.toLowerCase() === messageSearchTerm.toLowerCase() ? (
@@ -350,7 +362,20 @@ const Messages: React.FC = () => {
                       ) : (
                         msg.text
                       )}
-                    </p>
+                    </p>}
+                    {msg.attachments && (
+                      <a 
+                        href={`${API_URL}${msg.attachments}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center space-x-2 mt-2 p-2 rounded-lg ${
+                          msg.isMe ? 'bg-blue-400 hover:bg-blue-300' : 'bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        <Download size={16} />
+                        <span className="text-sm truncate">{msg.attachments.split('/').pop()}</span>
+                      </a>
+                    )}
                     <p className={`text-[10px] mt-1 text-right ${msg.isMe ? 'text-blue-100' : 'text-gray-400'}`}>
                       {msg.timestamp}
                     </p>
@@ -363,8 +388,20 @@ const Messages: React.FC = () => {
 
           {/* Input Area */}
           <div className="p-4 bg-white border-t border-gray-200">
+            {attachment && (
+              <div className="flex items-center justify-between bg-gray-100 p-2 rounded-lg mb-2 text-sm">
+                <span className="truncate">{attachment.name}</span>
+                <button onClick={() => setAttachment(null)} className="p-1 text-gray-500 hover:text-red-600">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             <div className="flex items-end space-x-2 bg-white border border-gray-300 rounded-xl p-2 focus-within:ring-2 focus-within:ring-blue-500 ring-offset-2">
-              <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
                 <Paperclip size={20} />
               </button>
               <textarea 
@@ -378,7 +415,7 @@ const Messages: React.FC = () => {
               />
               <button 
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim() || sending}
+                disabled={(!inputValue.trim() && !attachment) || sending}
                 className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
