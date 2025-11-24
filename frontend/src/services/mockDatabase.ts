@@ -94,6 +94,10 @@ export const getMyProposals = async (): Promise<Proposal[]> => {
   return fetchAPI<Proposal[]>('/proposals/my');
 };
 
+export const getReceivedProposals = async (): Promise<Proposal[]> => {
+  return fetchAPI<Proposal[]>('/proposals/received');
+};
+
 export const getProposalsForTask = async (taskId: number): Promise<Proposal[]> => {
   return fetchAPI<Proposal[]>(`/proposals/task/${taskId}`);
 };

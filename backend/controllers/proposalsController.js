@@ -19,7 +19,43 @@ const getMyProposals = async (req, res) => {
       ...r,
       status: normalizeStatus(r.status)
     }));
-    
+
+    res.json(proposals);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
+/**
+ * Get proposals received for tasks posted by current user
+ */
+const getReceivedProposals = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id,
+        p.task_id AS taskId,
+        p.applicant_id AS applicantId,
+        u.display_name AS applicantName,
+        p.amount,
+        p.message,
+        p.status,
+        DATE_FORMAT(p.created_at, "%Y-%m-%d") AS createdAt,
+        t.title AS taskTitle
+      FROM proposals p
+      JOIN tasks t ON p.task_id = t.id
+      JOIN users u ON p.applicant_id = u.id
+      WHERE t.poster_id = ?
+      ORDER BY p.created_at DESC
+    `, [userId]);
+
+    const proposals = rows.map(r => ({
+      ...r,
+      status: normalizeStatus(r.status)
+    }));
+
     res.json(proposals);
   } catch (err) {
     console.error(err);
@@ -255,6 +291,7 @@ const deleteProposal = async (req, res) => {
 
 module.exports = {
   getMyProposals,
+  getReceivedProposals,
   getProposalsForTask,
   createProposal,
   updateProposalStatus,

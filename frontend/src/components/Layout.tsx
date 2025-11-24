@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   Briefcase,
+  Inbox,
   LogOut,
   LogIn,
   UserPlus
@@ -119,6 +120,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/browse', label: 'Browse Tasks', icon: Search },
     { path: '/proposals', label: 'My Proposals', icon: FileText },
+    { path: '/received-proposals', label: 'Received Proposals', icon: Inbox },
     { path: '/contracts', label: 'Contracts', icon: Briefcase },
     { path: '/messages', label: 'Messages', icon: MessageSquare },
     { path: '/wallet', label: 'Wallet', icon: Wallet },
