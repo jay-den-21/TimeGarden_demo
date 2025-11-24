@@ -12,6 +12,7 @@ import Contracts from './pages/Contracts';
 import ContractDetails from './pages/ContractDetails';
 import Messages from './pages/Messages';
 import Proposals from './pages/Proposals';
+import MyTasks from './pages/MyTasks';
 import { isAuthenticated } from './services/authService';
 
 // Protected Route Component
@@ -47,6 +48,7 @@ const App: React.FC = () => {
                 <Route path="/contracts/:id" element={<ProtectedRoute><ContractDetails /></ProtectedRoute>} />
                 <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
                 <Route path="/proposals" element={<ProtectedRoute><Proposals /></ProtectedRoute>} />
+                <Route path="/my-tasks" element={<ProtectedRoute><MyTasks /></ProtectedRoute>} />
               </Routes>
             </Layout>
           }

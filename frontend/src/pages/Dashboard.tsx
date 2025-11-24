@@ -103,7 +103,7 @@ const Dashboard: React.FC = () => {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <div className="flex justify-between items-center mb-4">
                 <h4 className="font-semibold text-gray-800">My Tasks</h4>
-                <Link to="/browse" className="text-xs text-blue-600 hover:underline">View All</Link>
+                <Link to="/my-tasks" className="text-xs text-blue-600 hover:underline">View All</Link>
             </div>
             <div className="space-y-2">
                 <div className="flex justify-between text-sm"><span className="text-gray-500">Total Posted</span> <span>{myTasks.length}</span></div>
