@@ -9,6 +9,7 @@ router.get('/threads/:id/messages', getCurrentUserId, messagesController.getThre
 router.post('/threads/:id/messages', getCurrentUserId, messagesController.sendMessage);
 router.post('/threads/initiate', getCurrentUserId, messagesController.initiateThread);
 router.delete('/messages/:id', getCurrentUserId, messagesController.deleteMessage);
+router.delete('/threads/:id', getCurrentUserId, messagesController.deleteThread);
 
 module.exports = router;
 

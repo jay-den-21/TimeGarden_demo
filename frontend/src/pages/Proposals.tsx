@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, XCircle, Loader2, ArrowRight, ChevronRight } from 'lucide-react';
-import { getMyProposals } from '../services/mockDatabase';
+import { Link, useNavigate } from 'react-router-dom';
+import { FileText, Clock, CheckCircle, XCircle, Loader2, ArrowRight, ChevronRight, Trash2 } from 'lucide-react';
+import { getMyProposals, deleteProposal } from '../services/mockDatabase';
 import { Proposal } from '../types';
 
 const Proposals: React.FC = () => {
+  const navigate = useNavigate();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     getMyProposals().then(data => {
@@ -15,6 +17,22 @@ const Proposals: React.FC = () => {
       setLoading(false);
     });
   }, []);
+
+  const handleDeleteProposal = async (proposalId: number) => {
+    if (!confirm('Are you sure you want to delete this proposal? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingId(proposalId);
+    try {
+      await deleteProposal(proposalId);
+      setProposals(prev => prev.filter(p => p.id !== proposalId));
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete proposal');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const filteredProposals = proposals.filter(p => 
     filter === 'all' ? true : p.status === filter
@@ -109,6 +127,23 @@ const Proposals: React.FC = () => {
                                 >
                                     Go to Contract
                                 </Link>
+                            )}
+                            {proposal.status === 'pending' && (
+                                <button
+                                    onClick={() => handleDeleteProposal(proposal.id)}
+                                    disabled={deletingId === proposal.id}
+                                    className="flex items-center justify-center px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 w-full md:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Delete Proposal"
+                                >
+                                    {deletingId === proposal.id ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Trash2 size={16} className="mr-1" />
+                                            Delete
+                                        </>
+                                    )}
+                                </button>
                             )}
                         </div>
                     </div>

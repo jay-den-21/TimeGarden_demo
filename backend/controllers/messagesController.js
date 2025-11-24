@@ -288,10 +288,56 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+/**
+ * Delete all messages in a thread (delete entire conversation)
+ * Only participants can delete their conversation
+ */
+const deleteThread = async (req, res) => {
+  try {
+    const threadId = parseInt(req.params.id);
+    const userId = req.userId;
+
+    if (!threadId || isNaN(threadId)) {
+      return res.status(400).json({ error: 'Invalid thread ID' });
+    }
+
+    // Verify user is a participant
+    const [participants] = await pool.query(
+      'SELECT user_id FROM thread_participants WHERE thread_id = ? AND user_id = ?',
+      [threadId, userId]
+    );
+
+    if (participants.length === 0) {
+      return res.status(403).json({ error: 'You are not a participant in this thread' });
+    }
+
+    // Delete all messages in the thread
+    await pool.query('DELETE FROM messages WHERE thread_id = ?', [threadId]);
+
+    // Update thread's last_message_at
+    await pool.query(
+      'UPDATE threads SET last_message_at = NOW() WHERE id = ?',
+      [threadId]
+    );
+
+    // Emit deletion event via Socket.io if available
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`thread:${threadId}`).emit('thread_deleted', { threadId });
+    }
+
+    res.json({ success: true, message: 'Conversation deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
 module.exports = {
   getThreads,
   getThreadMessages,
   sendMessage,
   initiateThread,
-  deleteMessage
+  deleteMessage,
+  deleteThread
 };

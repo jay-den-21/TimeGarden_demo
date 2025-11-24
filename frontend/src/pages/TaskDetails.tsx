@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2, X } from 'lucide-react';
+import { Clock, Calendar, MapPin, Users, CheckCircle, XCircle, MessageCircle, Briefcase, Loader2, X, Trash2 } from 'lucide-react';
 // Ensure all necessary functions are imported, including initiateThread
 import { 
   getTaskById, 
@@ -8,7 +8,8 @@ import {
   getProposalsForTask, 
   createProposal, 
   updateProposalStatus, 
-  initiateThread // <--- Imported here
+  initiateThread,
+  deleteTask
 } from '../services/mockDatabase';
 import { TaskStatus, Task, Proposal, User } from '../types';
 
@@ -86,6 +87,23 @@ const TaskDetails: React.FC = () => {
   };
   // ----------------------------------------------------
 
+  // Handle task deletion
+  const handleDeleteTask = async () => {
+    if (!task || !isOwner) return;
+    
+    if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteTask(task.id);
+      alert('Task deleted successfully');
+      navigate('/browse');
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete task');
+    }
+  };
+
   const handleSubmitProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     setProposalError(null);
@@ -153,9 +171,21 @@ const TaskDetails: React.FC = () => {
                     </span>
                 </div>
             </div>
-            <div className="text-right">
-                <div className="text-2xl font-bold text-blue-600">{task.budget} TC</div>
-                <div className="text-sm text-gray-500">Fixed Budget</div>
+            <div className="flex items-center space-x-4">
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">{task.budget} TC</div>
+                    <div className="text-sm text-gray-500">Fixed Budget</div>
+                </div>
+                {isOwner && (
+                    <button
+                        onClick={handleDeleteTask}
+                        className="flex items-center px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                        title="Delete Task"
+                    >
+                        <Trash2 size={18} className="mr-2" />
+                        Delete
+                    </button>
+                )}
             </div>
         </div>
       </div>

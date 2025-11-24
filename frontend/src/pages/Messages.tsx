@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Send, Paperclip, MoreVertical, Phone, Video, Loader2 } from 'lucide-react';
-import { getMyThreads, getThreadMessages, sendMessage } from '../services/mockDatabase';
+import { Search, Send, Paperclip, MoreVertical, Phone, Video, Loader2, Trash2 } from 'lucide-react';
+import { getMyThreads, getThreadMessages, sendMessage, deleteMessage, deleteThread } from '../services/mockDatabase';
 import { socketService } from '../services/socketService';
 import { ChatThread, ChatMessage } from '../types';
 import { getUser } from '../services/authService';
@@ -14,6 +14,8 @@ const Messages: React.FC = () => {
   const [messageSearchTerm, setMessageSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null);
+  const [deletingThreadId, setDeletingThreadId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const currentUser = getUser();
@@ -137,6 +139,46 @@ const Messages: React.FC = () => {
     }
   };
 
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!confirm('Are you sure you want to delete this message?')) {
+      return;
+    }
+
+    setDeletingMessageId(messageId);
+    try {
+      await deleteMessage(messageId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete message');
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
+  const handleDeleteThread = async (threadId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent thread selection
+    
+    if (!confirm('Are you sure you want to delete this entire conversation? All messages will be permanently deleted. This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingThreadId(threadId);
+    try {
+      await deleteThread(threadId);
+      // Remove thread from list
+      setThreads(prev => prev.filter(t => t.id !== threadId));
+      // If deleted thread was active, clear it
+      if (activeThreadId === threadId) {
+        setActiveThreadId(null);
+        setMessages([]);
+      }
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete conversation');
+    } finally {
+      setDeletingThreadId(null);
+    }
+  };
+
   const activeThread = threads.find(t => t.id === activeThreadId);
   const colors = ['bg-orange-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500'];
 
@@ -174,7 +216,7 @@ const Messages: React.FC = () => {
             <div 
               key={thread.id}
               onClick={() => setActiveThreadId(thread.id)}
-              className={`p-4 flex items-start space-x-3 cursor-pointer transition-colors ${activeThreadId === thread.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+              className={`p-4 flex items-start space-x-3 cursor-pointer transition-colors group relative ${activeThreadId === thread.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
             >
               <div className={`w-10 h-10 ${colors[index % colors.length]} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}>
                 {thread.partnerName.charAt(0)}
@@ -187,11 +229,25 @@ const Messages: React.FC = () => {
                 <p className="text-xs text-gray-500 truncate mb-1">{thread.taskTitle}</p>
                 <p className="text-sm text-gray-600 truncate">{thread.lastMessage}</p>
               </div>
-              {thread.unreadCount > 0 && (
-                <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold mt-2">
-                  {thread.unreadCount}
-                </div>
-              )}
+              <div className="flex items-center space-x-2">
+                {thread.unreadCount > 0 && (
+                  <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    {thread.unreadCount > 99 ? '99+' : thread.unreadCount}
+                  </div>
+                )}
+                <button
+                  onClick={(e) => handleDeleteThread(thread.id, e)}
+                  disabled={deletingThreadId === thread.id}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                  title="Delete conversation"
+                >
+                  {deletingThreadId === thread.id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                </button>
+              </div>
             </div>
             ))}
           {threads.filter(thread => {
@@ -235,6 +291,21 @@ const Messages: React.FC = () => {
                   onChange={(e) => setMessageSearchTerm(e.target.value)}
                 />
               </div>
+              <button
+                onClick={() => activeThreadId && handleDeleteThread(activeThreadId, {} as React.MouseEvent)}
+                disabled={!activeThreadId || deletingThreadId === activeThreadId}
+                className="flex items-center px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Delete entire conversation"
+              >
+                {deletingThreadId === activeThreadId ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 size={16} className="mr-1" />
+                    Delete Conversation
+                  </>
+                )}
+              </button>
               <Phone size={20} className="hover:text-gray-800 cursor-pointer" />
               <Video size={20} className="hover:text-gray-800 cursor-pointer" />
               <MoreVertical size={20} className="hover:text-gray-800 cursor-pointer" />
@@ -259,12 +330,26 @@ const Messages: React.FC = () => {
                          msg.senderName.toLowerCase().includes(search);
                 })
                 .map(msg => (
-                <div key={msg.id} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                <div key={msg.id} className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'} group`}>
+                  <div className={`max-w-[70%] rounded-2xl px-4 py-3 relative ${
                     msg.isMe
                       ? 'bg-blue-500 text-white rounded-br-none' 
                       : 'bg-white border border-gray-100 shadow-sm rounded-bl-none'
                   }`}>
+                    {msg.isMe && (
+                      <button
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        disabled={deletingMessageId === msg.id}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 disabled:opacity-50"
+                        title="Delete message"
+                      >
+                        {deletingMessageId === msg.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={12} />
+                        )}
+                      </button>
+                    )}
                     {!msg.isMe && (
                       <p className="text-xs font-semibold mb-1 text-gray-700">{msg.senderName}</p>
                     )}

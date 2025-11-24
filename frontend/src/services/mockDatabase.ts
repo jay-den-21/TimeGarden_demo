@@ -135,6 +135,15 @@ export const deleteMessage = async (messageId: number): Promise<{ success: boole
   });
 };
 
+/**
+ * Delete entire conversation (all messages in a thread)
+ */
+export const deleteThread = async (threadId: number): Promise<{ success: boolean; message: string }> => {
+  return fetchAPI(`/threads/${threadId}`, {
+    method: 'DELETE',
+  });
+};
+
 export const getReviewsForUser = async (userId: number): Promise<Review[]> => {
   return fetchAPI<Review[]>(`/reviews/user/${userId}`);
 };
