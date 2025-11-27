@@ -2,6 +2,17 @@
 -- This script demonstrates RBAC with GRANT/REVOKE and stored procedures that enforce
 -- per-user access (requester vs. provider). Run manually in MySQL 8+ as needed.
 
+-- 0) Create users:
+SELECT host,user FROM mysql.user WHERE user='timegarden_app';
+DROP USER IF EXISTS 'timegarden_app'@'%';
+DROP USER IF EXISTS 'timegarden_app'@'localhost';
+FLUSH PRIVILEGES;
+CREATE USER 'timegarden_app'@'%' IDENTIFIED BY '12345678';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON TimeGarden.* TO 'timegarden_app'@'%';
+FLUSH PRIVILEGES;
+
+
+
 -- 1) Roles
 CREATE ROLE IF NOT EXISTS requester_role;
 CREATE ROLE IF NOT EXISTS provider_role;
