@@ -79,6 +79,146 @@ END//
 DELIMITER ;
 GRANT EXECUTE ON PROCEDURE sp_update_proposal_status TO requester_role;
 
+-- 4b) Trigger: validate contract creation constraints
+DROP TRIGGER IF EXISTS trg_contract_validate;
+DELIMITER //
+CREATE TRIGGER trg_contract_validate
+BEFORE INSERT ON contracts
+FOR EACH ROW
+BEGIN
+  DECLARE v_balance DECIMAL(10,2);
+
+  -- Requester and provider must be different people
+  IF NEW.requester_id = NEW.provider_id THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Requester and provider must be different users.';
+  END IF;
+
+  -- Requester must have an active wallet
+  SELECT balance INTO v_balance
+    FROM wallets
+   WHERE user_id = NEW.requester_id
+   FOR UPDATE;
+  IF v_balance IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Requester must have an active wallet.';
+  END IF;
+
+  -- Ensure escrow already has the funds being committed
+  SELECT escrow_balance INTO v_balance
+    FROM wallets
+   WHERE user_id = NEW.requester_id
+   FOR UPDATE;
+  IF v_balance < NEW.amount THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Insufficient escrow balance to create contract.';
+  END IF;
+END//
+DELIMITER ;
+
+-- 4c) Stored Procedure: release contract payment from escrow (requester-only)
+DROP PROCEDURE IF EXISTS sp_release_contract_payment;
+DELIMITER //
+CREATE PROCEDURE sp_release_contract_payment(
+  IN p_contract_id INT,
+  IN p_actor_user_id INT,
+  IN p_amount DECIMAL(10,2)
+)
+BEGIN
+  DECLARE v_requester INT;
+  DECLARE v_provider INT;
+  DECLARE v_agreed DECIMAL(10,2);
+  DECLARE v_use_amount DECIMAL(10,2);
+  DECLARE v_escrow_balance DECIMAL(10,2);
+  DECLARE v_status ENUM('awaiting_escrow','active','delivered','completed','disputed','cancelled','in_progress','awaiting_review');
+
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  START TRANSACTION;
+
+  -- Lock the contract row and verify the actor is the requester
+  SELECT requester_id, provider_id, amount, status
+    INTO v_requester, v_provider, v_agreed, v_status
+    FROM contracts
+   WHERE id = p_contract_id
+   FOR UPDATE;
+
+  IF v_requester IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Contract not found.';
+  END IF;
+
+  IF p_actor_user_id <> v_requester THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Only the requester can release payment.';
+  END IF;
+
+  IF v_status IN ('cancelled', 'disputed', 'completed') THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Payment cannot be released for this contract status.';
+  END IF;
+
+  -- Determine how much to release (defaults to the agreed amount, capped at it)
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    SET v_use_amount = v_agreed;
+  ELSEIF p_amount > v_agreed THEN
+    SET v_use_amount = v_agreed;
+  ELSE
+    SET v_use_amount = p_amount;
+  END IF;
+
+  -- Verify escrow funds are available on the requester wallet
+  SELECT escrow_balance
+    INTO v_escrow_balance
+    FROM wallets
+   WHERE user_id = v_requester
+   FOR UPDATE;
+
+  IF v_escrow_balance IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Requester wallet not found.';
+  END IF;
+
+  IF v_escrow_balance < v_use_amount THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Not enough escrow to release payment.';
+  END IF;
+
+  -- Move funds from requester escrow to provider balance
+  UPDATE wallets
+     SET escrow_balance = escrow_balance - v_use_amount
+   WHERE user_id = v_requester;
+
+  UPDATE wallets
+     SET balance = balance + v_use_amount
+   WHERE user_id = v_provider;
+
+  -- Record the escrow release for auditability
+  INSERT INTO transactions (wallet_id, contract_id, amount, type, description, status)
+  VALUES (v_provider, p_contract_id, v_use_amount, 'escrow_release',
+          CONCAT('Release for contract ', p_contract_id), 'success');
+
+  -- Update contract status/end date on full release
+  IF v_use_amount >= v_agreed THEN
+    UPDATE contracts
+       SET status = 'completed',
+           end_date = NOW()
+     WHERE id = p_contract_id;
+  ELSE
+    UPDATE contracts
+       SET status = 'in_progress'
+     WHERE id = p_contract_id;
+  END IF;
+
+  COMMIT;
+END//
+DELIMITER ;
+GRANT EXECUTE ON PROCEDURE sp_release_contract_payment TO requester_role;
+
 -- 5) Remove direct write access; enforce writes through procedures
 -- REVOKE INSERT, UPDATE, DELETE ON TimeGarden.proposals FROM requester_role;
 -- REVOKE INSERT, UPDATE, DELETE ON TimeGarden.proposals FROM provider_role;

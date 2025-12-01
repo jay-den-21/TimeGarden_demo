@@ -71,72 +71,64 @@ const getContractById = async (req, res) => {
  * Logic: If status -> 'completed', move funds from Escrow to Provider.
  */
 const updateContractStatus = async (req, res) => {
-  const connection = await pool.getConnection(); // 1. Get a dedicated connection
+  const contractId = req.params.id;
+  const { status, releaseAmount } = req.body; // releaseAmount optional for partial payouts
+  const userId = req.userId;
+
+  // When marking completed, delegate to the DB proc so funds move atomically
+  if (status === 'completed') {
+    try {
+      await pool.query('CALL sp_release_contract_payment(?,?,?)', [
+        contractId,
+        userId,
+        releaseAmount || null
+      ]);
+
+      // Return the latest status from the DB (proc may keep it in_progress for partial releases)
+      const [rows] = await pool.query(
+        'SELECT status FROM contracts WHERE id = ?',
+        [contractId]
+      );
+
+      if (!rows.length) {
+        return res.status(404).json({ error: 'Contract not found' });
+      }
+
+      return res.json({ success: true, status: normalizeStatus(rows[0].status) });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: err.message || 'Database error' });
+    }
+  }
+
+  // Fallback for other status transitions
+  const connection = await pool.getConnection();
   try {
-    await connection.beginTransaction(); // 2. Start a Transaction (Safety Net)
+    await connection.beginTransaction();
 
-    const contractId = req.params.id;
-    const { status } = req.body; // Expected: 'delivered' or 'completed'
-    
-    console.log(`👉 Updating Contract #${contractId} to status: ${status}`);
+    const [contracts] = await connection.query(
+      'SELECT id FROM contracts WHERE id = ?',
+      [contractId]
+    );
 
-    // Get current contract details first
-    const [contracts] = await connection.query('SELECT * FROM contracts WHERE id = ?', [contractId]);
-    if (contracts.length === 0) {
-        throw new Error('Contract not found');
-    }
-    const contract = contracts[0];
-
-    // === FUND TRANSFER LOGIC ===
-    // Only execute if we are marking it as 'completed' AND it wasn't completed before
-    if (status === 'completed' && contract.status !== 'completed') {
-        console.log(`💰 Processing Payment of ${contract.amount} TC...`);
-
-        // A. Requester: Deduct from Escrow Balance (Money leaves escrow)
-        await connection.query(
-            'UPDATE wallets SET escrow_balance = escrow_balance - ? WHERE user_id = ?',
-            [contract.amount, contract.requester_id]
-        );
-
-        // B. Provider: Add to Available Balance (Money enters wallet)
-        await connection.query(
-            'UPDATE wallets SET balance = balance + ? WHERE user_id = ?',
-            [contract.amount, contract.provider_id]
-        );
-
-        // C. Record Transaction: "Escrow Release"
-        await connection.query(
-            'INSERT INTO transactions (wallet_id, contract_id, amount, type, description, status) VALUES (?, ?, ?, ?, ?, ?)',
-            [contract.provider_id, contractId, contract.amount, 'escrow_release', `Payment received for Contract #${contractId}`, 'success']
-        );
-        
-        // Update contract end_date
-        await connection.query(
-            'UPDATE contracts SET end_date = NOW() WHERE id = ?', 
-            [contractId]
-        );
-        
-        // Also update the linked Task status to 'completed'
-        // (We need to find the proposal first to find the task... simplified here by assuming we query via JOIN if needed, 
-        // but for now let's just update contract status)
+    if (!contracts.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: 'Contract not found' });
     }
 
-    // Update the contract status
     await connection.query(
       'UPDATE contracts SET status = ? WHERE id = ?',
       [status, contractId]
     );
 
-    await connection.commit(); // 3. Save everything
-    console.log('✅ Contract updated and funds transferred (if completed).');
-    
-    res.json({ success: true, status });
+    await connection.commit();
+    res.json({ success: true, status: normalizeStatus(status) });
   } catch (err) {
-    await connection.rollback(); // 4. Undo changes if anything failed
+    await connection.rollback();
     console.error(err);
     res.status(500).json({ error: 'Database error' });
   } finally {
-    connection.release(); // 5. Release connection
+    connection.release();
   }
 };
 
